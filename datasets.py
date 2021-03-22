@@ -1,6 +1,7 @@
 # Standard lib python import
 import glob
 import os
+import math
 
 # Specialized python lib
 import numpy as np
@@ -31,6 +32,11 @@ def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 		batch = np.load(f)
 		data.append(batch)
 	data = np.concatenate(tuple(data))
+	#print(data.shape)
+	data = data.reshape(data.shape[0], 1, data.shape[1], data.shape[2])
+	#print(data.shape)
+	#print(data[0])
+	#exit(0)
 	return data
 
 def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9) -> tuple:
@@ -55,40 +61,6 @@ def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9)
 		train_images[image_type.upper()] = tmp_images[:int(train_split * n_examples)]
 		test_images[image_type.upper()] = tmp_images[int(train_split * n_examples):]
 	return train_images, test_images
-
-def train_valid_loaders(dataset : Dataset, batch_size : int, train_split : float=0.8, shuffle : bool=True, seed : int=42):
-	"""
-	Divise un jeu de données en ensemble d'entraînement et de validation et retourne pour chacun un DataLoader PyTorch.
-
-	Args:
-		dataset (torch.utils.data.Dataset): Un jeu de données PyTorch
-		batch_size (int): La taille de batch désirée pour le DataLoader
-		train_split (float): Un nombre entre 0 et 1 correspondant à la proportion d'exemple de l'ensemble
-			d'entraînement.
-		shuffle (bool): Si les exemples sont mélangés aléatoirement avant de diviser le jeu de données.
-		seed (int): Le seed aléatoire pour que l'ordre des exemples mélangés soit toujours le même.
-
-	Returns:
-		Tuple (DataLoader d'entraînement, DataLoader de test).
-	"""
-	num_data = len(dataset)
-	indices = np.arange(num_data)
-
-	if shuffle:
-		np.random.seed(seed)
-		np.random.shuffle(indices)
-
-	split = math.floor(train_split * num_data)
-	train_idx, valid_idx = indices[:split], indices[split:]
-
-	train_dataset = Subset(dataset, train_idx)
-	valid_dataset = Subset(dataset, valid_idx)
-
-	train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-	valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
-
-	return train_loader, valid_loader
-
 
 class BreastCTDataset(Dataset):
 	def __init__(self, data : np.ndarray, targets : np.ndarray):

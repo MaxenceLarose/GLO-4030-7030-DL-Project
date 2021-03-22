@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Local project import
-from datasets import load_all_images, BreastCTDataset, train_valid_loaders
+from datasets import load_all_images, BreastCTDataset
 
 # pytorch
 from torch.utils.data import Dataset
@@ -25,9 +25,9 @@ def draw_images(images : dict, image_idx=0):
 def draw_data_targets(dataset : Dataset, image_idx=0):
 	fig, ax = plt.subplots(1, 2)
 	data, targets = dataset.to_numpy()
-	ax[0].imshow(data[image_idx])
+	ax[0].imshow(data[image_idx][0])
 	ax[0].set_title("Data")
-	ax[1].imshow(targets[image_idx])
+	ax[1].imshow(targets[image_idx][0])
 	ax[1].set_title("Target")
 	plt.show()
 
