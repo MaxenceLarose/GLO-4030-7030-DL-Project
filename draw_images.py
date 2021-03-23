@@ -31,6 +31,11 @@ def draw_data_targets(dataset : Dataset, image_idx=0):
 	ax[1].set_title("Target")
 	plt.show()
 
+
+def draw_pred_target():
+	# TODO
+	return
+
 if __name__ == '__main__':
 	train_images, test_images = load_all_images(n_batch=1)
 	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
