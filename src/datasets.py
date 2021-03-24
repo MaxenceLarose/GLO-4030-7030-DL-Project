@@ -1,4 +1,5 @@
 # Standard lib python import
+import logging
 import glob
 import os
 import math
@@ -27,10 +28,13 @@ def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 	"""
 	files = glob.glob(os.path.join(path, "{}*.npy.gz".format(image_type)))
 	data = []
+	logging.info(f"\n{'-' * 25}\nLoading {image_type}\n{'-' * 25}")
 	for file in files[:n_batch]:
+		logging.info(f"Loading file {file}")
 		f = gzip.GzipFile(file, "r")
 		batch = np.load(f)
 		data.append(batch)
+
 	data = np.concatenate(tuple(data))
 	#print(data.shape)
 	data = data.reshape(data.shape[0], 1, data.shape[1], data.shape[2])
@@ -38,6 +42,7 @@ def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 	#print(data[0])
 	#exit(0)
 	return data
+
 
 def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9) -> tuple:
 	"""
@@ -61,6 +66,7 @@ def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9)
 		train_images[image_type.upper()] = tmp_images[:int(train_split * n_examples)]
 		test_images[image_type.upper()] = tmp_images[int(train_split * n_examples):]
 	return train_images, test_images
+
 
 class BreastCTDataset(Dataset):
 	def __init__(self, data : np.ndarray, targets : np.ndarray):
