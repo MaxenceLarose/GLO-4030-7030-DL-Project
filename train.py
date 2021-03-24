@@ -7,7 +7,7 @@ import torch.optim as optim
 import torch.nn as nn
 import torch
 from unet import UNet
-from draw_images import draw_data_targets
+from draw_images import draw_data_targets, draw_pred_target
 import numpy as np
 from sklearn.metrics import mean_squared_error
 from metrics import validate
@@ -69,9 +69,10 @@ def train_network(network, dataset, *, optimizer : str="Adam", lr=0.001, weight_
 	if optimizer == "Adam":
 		opt = optim.Adam(unet.parameters(), lr=lr, weight_decay=weight_decay)
 	elif optimizer == "SGD":
-		opt = optim.SGD(unet.parameters(), lr=lr, weight_decay=weight_decay)
+		opt = optim.SGD(unet.parameters(), lr=lr, weight_decay=weight_decay, momentum=0.9)
 	else:
 		raise RuntimeError("{} optimizer not available!".format(optimizer))
+	scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
 	# loss function
 	if criterion == "MSELoss":
 		loss = nn.MSELoss()
@@ -82,8 +83,8 @@ def train_network(network, dataset, *, optimizer : str="Adam", lr=0.001, weight_
 		network.cuda()
 
 	n_batch = len(train_loader)
-	for i_epoch in range(n_epoch):
-		t0 = time.time() 
+	t0 = time.time()
+	for i_epoch in range(n_epoch): 
 		network.train()
 		with torch.enable_grad():
 			for j, (inputs, targets) in enumerate(train_loader):
@@ -96,13 +97,15 @@ def train_network(network, dataset, *, optimizer : str="Adam", lr=0.001, weight_
 				batch_loss.backward()
 				opt.step()
 				j += 1
-				sys.stdout.write("%s[%s%s] %i/%i\r" % ("mini batch :", "#"*j, "."*(n_batch-j), j, n_batch))
-				sys.stdout.flush()
+				# sys.stdout.write("%s[%s%s] %i/%i\r" % ("mini batch :", "#"*j, "."*(n_batch-j), j, n_batch))
+				# sys.stdout.flush()
+		train_loss, train_RMSE = validate(network, train_loader, loss, use_gpu=use_gpu)
+		valid_loss, valid_RMSE = validate(network, valid_loader, loss, use_gpu=use_gpu)
 		t1 = time.time()
-		train_loss, train_RMSE = validate(network, train_loader, loss)
-		valid_loss, valid_RMSE = validate(network, valid_loader, loss)
+		scheduler.step(valid_loss)
+		lr = opt.param_groups[0]['lr']
 		history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
-		print(f'Epoch {i_epoch} ({t1-t0:.1f} s) - Train RMSE: {train_RMSE:.8f} - Val RMSE: {valid_RMSE:.8f} - Train loss: {train_loss:.8f} - Val loss: {valid_loss:.8f}')
+		print(f'Epoch {i_epoch} ({t1-t0:.1f} s) - Train RMSE: {train_RMSE:.8f} - Val RMSE: {valid_RMSE:.8f} - Train loss: {train_loss:.8f} - Val loss: {valid_loss:.8f} - lr: {lr:.2e}')
 
 	#batch_metrics = pt.SKLearnMetrics([mean_squared_error])
 	# epoch_metrics = pt.SKLearnMetrics([mean_squared_error])
@@ -112,24 +115,37 @@ def train_network(network, dataset, *, optimizer : str="Adam", lr=0.001, weight_
 	# 					epochs=n_epoch,
 	# 					progress_options=dict(coloring=False),
 	# 					callbacks=callbacks)
-
-	return history_callback.history
+	image_idx = 0
+	with torch.no_grad():
+		for i, (inputs, targets) in enumerate(valid_loader):
+			if use_gpu:
+				inputs = inputs.cuda()
+				targets = targets.cuda()
+			pred = network(inputs)
+			pred = pred.cpu().numpy()
+			inputs = inputs.cpu().numpy()
+			targets = targets.cpu().numpy()
+			draw_pred_target(inputs, targets, pred, image_idx=image_idx, fig_id=i)
+	return history
 
 #def train_network_2
 
 
 if __name__ == '__main__':
-	train_images, test_images = load_all_images(n_batch=1)
-	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"][:100], train_images["PHANTOM"][:100])
+	train_images, test_images = load_all_images(n_batch=4)
+	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
 	#draw_data_targets(breast_CT_dataset_train)
 	#exit(0)
 	unet = UNet(1,1)
 	print("Nombre de paramètres:", np.sum([p.numel() for p in unet.parameters()]))
 
 	lr = 0.001
-	n_epoch = 5
-	batch_size = 4
+	n_epoch = 100
+	batch_size = 1
+	weight_decay = 1e-4
 	criterion = "MSELoss"
-	optimizer = "Adam"
-	train_network(unet, breast_CT_dataset_train, optimizer=optimizer, lr=lr, n_epoch=n_epoch, batch_size=batch_size, criterion=criterion, use_gpu=True)
+	optimizer = "SGD"
+	history = train_network(unet, breast_CT_dataset_train, optimizer=optimizer, lr=lr, weight_decay=weight_decay,
+	 n_epoch=n_epoch, batch_size=batch_size, criterion=criterion, use_gpu=True)
+	history.display()
 

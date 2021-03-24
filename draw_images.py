@@ -4,6 +4,7 @@ import os
 # Specialized python lib
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Local project import
 from datasets import load_all_images, BreastCTDataset
@@ -23,8 +24,8 @@ def draw_images(images : dict, image_idx=0):
 	plt.show()
 
 def draw_data_targets(dataset : Dataset, image_idx=0):
-	fig, ax = plt.subplots(1, 2)
 	data, targets = dataset.to_numpy()
+	fig, ax = plt.subplots(1, 2)
 	ax[0].imshow(data[image_idx][0])
 	ax[0].set_title("Data")
 	ax[1].imshow(targets[image_idx][0])
@@ -32,9 +33,41 @@ def draw_data_targets(dataset : Dataset, image_idx=0):
 	plt.show()
 
 
-def draw_pred_target():
-	# TODO
-	return
+def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path="Figures"):
+	fig, ax = plt.subplots(2, 2, figsize=(14,10))
+	size_split = 10
+	im1 = ax[0,0].imshow(inputs[image_idx][0], cmap='Greys')
+	divider1 = make_axes_locatable(ax[0,0])
+	cax1 = divider1.append_axes("right", size="{}%".format(size_split), pad=0.05)
+	cbar1 = plt.colorbar(im1, cax=cax1)
+	ax[0,0].set_title("Input")
+
+	im2 = ax[0,1].imshow(targets[image_idx][0], cmap='Greys')
+	divider2 = make_axes_locatable(ax[0,1])
+	cax2 = divider2.append_axes("right", size="{}%".format(size_split), pad=0.05)
+	cbar2 = plt.colorbar(im2, cax=cax2)
+	ax[0,1].set_title("Target")
+
+	im3 = ax[1,0].imshow(pred[image_idx][0], cmap='Greys')
+	divider3 = make_axes_locatable(ax[1,0])
+	cax3 = divider3.append_axes("right", size="{}%".format(size_split), pad=0.05)
+	cbar3 = plt.colorbar(im3, cax=cax3)
+	ax[1,0].set_title("Prediction")
+
+	diff_im = 100*(pred[image_idx][0] - targets[image_idx][0]) / targets[image_idx][0]
+	im4 = ax[1,1].imshow(diff_im, cmap='Greys', vmin=-5, vmax=5)
+	divider4 = make_axes_locatable(ax[1,1])
+	cax4 = divider4.append_axes("right", size="{}%".format(size_split), pad=0.05)
+	cbar4 = plt.colorbar(im4, cax=cax4)
+	ax[1,1].set_title("Rel Diff (%)")
+	# ax[1].imshow(targets[image_idx][0])
+	# ax[1].set_title("MSE")
+	if not os.path.isdir(output_path):
+		os.path.makedirs(output_path)
+	plt.savefig("{}/pred_valid_{}".format(output_path, fig_id), bbox_inches='tight')
+	plt.close(fig)
+	#plt.show()
+	# return
 
 if __name__ == '__main__':
 	train_images, test_images = load_all_images(n_batch=1)
