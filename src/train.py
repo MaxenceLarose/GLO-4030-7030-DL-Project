@@ -1,27 +1,31 @@
 import logging
-from datasets import load_all_images, BreastCTDataset
-from deeplib.history import History
-from deeplib.training import test, HistoryCallback, get_model
-from deeplib.datasets import train_valid_loaders
+import warnings
+import time
+import numpy as np
+import sys
+
 import poutyne as pt
 import torch.optim as optim
 import torch.nn as nn
 import torch
+from torch.utils.data import Dataset
 from unet import UNet
-from draw_images import draw_data_targets, draw_pred_target
-import numpy as np
+
 from sklearn.metrics import mean_squared_error
+from deeplib.history import History
+from deeplib.training import test, HistoryCallback
+from deeplib.datasets import train_valid_loaders
+
+from draw_images import draw_data_targets, draw_pred_target
 from metrics import validate
-import sys
-import warnings
-import time
+from datasets import load_all_images, BreastCTDataset
 from logging_tools import logs_file_setup, log_device_setup, set_seed
 
 
 # Fonction qui provient de la librairie deeplib (https://github.com/ulaval-damas/glo4030-labs/tree/master/deeplib)
 # Le code a été adapté pour utiliser toutes les données mnist pour l'entrainement.
 def train_network(
-		network,
+		network: nn.Module,
 		dataset,
 		*,
 		optimizer: str = "Adam",
@@ -56,6 +60,7 @@ def train_network(
 	history = History()
 	callbacks = [history_callback] if callbacks is None else [history_callback] + callbacks
 	train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size)
+
 	# optimizer
 	if optimizer == "Adam":
 		opt = optim.Adam(unet.parameters(), lr=lr, weight_decay=weight_decay)
@@ -64,6 +69,7 @@ def train_network(
 	else:
 		raise RuntimeError("{} optimizer not available!".format(optimizer))
 	scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
+
 	# loss function
 	if criterion == "MSELoss":
 		loss = nn.MSELoss()
