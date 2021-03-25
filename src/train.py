@@ -18,30 +18,6 @@ import time
 from logging_tools import logs_file_setup, log_device_setup, set_seed
 
 
-def get_model(network, epoch_metrics, optimizer=None, criterion=None, use_gpu=True):
-	"""
-	Obtient un modèle Poutyne pour un réseau de neurones PyTorch. On suppose que la sortie du réseau est compatible avec
-	la fonction cross-entropy de PyTorch pour pouvoir utiliser l'exactitude (accuracy).
-
-	Args:
-		network (nn.Module): Un réseau de neurones PyTorch
-		optimizer (torch.optim.Optimizer): Un optimiseur PyTorch
-		criterion: Une fonction de perte compatible avec la cross-entropy de PyTorch
-		use_gpu (bool): Si on veut utiliser le GPU. Est vrai par défaut. Un avertissement est lancé s'il n'y a pas de
-						GPU.
-	"""
-	if criterion is None:
-		criterion = nn.CrossEntropyLoss()
-
-	model = pt.Model(network, optimizer, criterion, epoch_metrics=epoch_metrics)
-	if use_gpu:
-		if torch.cuda.is_available():
-			model.cuda()
-		else:
-			warnings.warn("Aucun GPU disponible")
-	return model
-
-
 # Fonction qui provient de la librairie deeplib (https://github.com/ulaval-damas/glo4030-labs/tree/master/deeplib)
 # Le code a été adapté pour utiliser toutes les données mnist pour l'entrainement.
 def train_network(
@@ -121,15 +97,9 @@ def train_network(
 		lr = opt.param_groups[0]['lr']
 		history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
 		print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.8f} - Val RMSE: {valid_RMSE:.8f} - Train loss: {train_loss:.8f} - Val loss: {valid_loss:.8f} - lr: {lr:.2e}')
-
-	# batch_metrics = pt.SKLearnMetrics([mean_squared_error])
-	# epoch_metrics = pt.SKLearnMetrics([mean_squared_error])
-	# model = get_model(network, [epoch_metrics], opt, loss, use_gpu=use_gpu)
-	# model.fit_generator(train_loader,
-	# 					valid_loader,
-	# 					epochs=n_epoch,
-	# 					progress_options=dict(coloring=False),
-	# 					callbacks=callbacks)
+	# --------------------------------------------------------------------------------- #
+	#                            save validation images                                 #
+	# --------------------------------------------------------------------------------- #
 	image_idx = 0
 	with torch.no_grad():
 		for i, (inputs, targets) in enumerate(valid_loader):
@@ -142,8 +112,6 @@ def train_network(
 			targets = targets.cpu().numpy()
 			draw_pred_target(inputs, targets, pred, image_idx=image_idx, fig_id=i)
 	return history
-
-# def train_network_2
 
 
 if __name__ == '__main__':
