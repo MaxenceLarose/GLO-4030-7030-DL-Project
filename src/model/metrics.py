@@ -2,6 +2,7 @@ from sklearn.metrics import mean_squared_error
 import torch
 import numpy as np
 
+
 def validate(network, valid_loader, criterion, use_gpu=True):
 	loss = []
 	RMSE = []

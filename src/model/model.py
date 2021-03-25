@@ -1,10 +1,12 @@
-####### This piece of code was taken from https://github.com/milesial/Pytorch-UNet #######
-
-""" Parts of the U-Net model """
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+# --------------------------------------------------------------------------------- #
+#                                  Unet model                                       #
+#    This piece of code was taken from https://github.com/milesial/Pytorch-UNet     #
+# --------------------------------------------------------------------------------- #
 
 
 class DoubleConv(nn.Module):
@@ -81,6 +83,7 @@ class OutConv(nn.Module):
 
 
 class UNet(nn.Module):
+
     def __init__(self, n_channels, n_classes, bilinear=True):
         super(UNet, self).__init__()
         self.n_channels = n_channels

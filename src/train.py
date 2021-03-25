@@ -1,25 +1,21 @@
 import logging
-import warnings
 import time
 import numpy as np
-import sys
 
-import poutyne as pt
 import torch.optim as optim
 import torch.nn as nn
 import torch
-from torch.utils.data import Dataset
-from unet import UNet
+from model.model import UNet
 
-from sklearn.metrics import mean_squared_error
 from deeplib.history import History
-from deeplib.training import test, HistoryCallback
+from deeplib.training import HistoryCallback
 from deeplib.datasets import train_valid_loaders
 
-from draw_images import draw_data_targets, draw_pred_target
-from metrics import validate
-from datasets import load_all_images, BreastCTDataset
-from logging_tools import logs_file_setup, log_device_setup, set_seed
+from draw_images import draw_pred_target
+from model.metrics import validate
+from data_loader.data_loaders import load_all_images
+from data_loader.datasets import BreastCTDataset
+from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
 
 
 # Fonction qui provient de la librairie deeplib (https://github.com/ulaval-damas/glo4030-labs/tree/master/deeplib)

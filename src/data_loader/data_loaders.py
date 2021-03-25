@@ -8,10 +8,6 @@ import math
 import numpy as np
 import gzip
 
-# pytorch
-import torch
-from torch.utils.data import Subset, Dataset, DataLoader
-
 
 def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 	"""
@@ -70,19 +66,3 @@ def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,
 		train_images[image_type.upper()] = tmp_images[:int(train_split * n_examples)]
 		test_images[image_type.upper()] = tmp_images[int(train_split * n_examples):]
 	return train_images, test_images
-
-
-class BreastCTDataset(Dataset):
-	def __init__(self, data : np.ndarray, targets : np.ndarray):
-		# TODO
-		self.data = torch.Tensor(data)
-		self.targets = torch.Tensor(targets)
-	
-	def __len__(self):
-		return len(self.targets)
-
-	def __getitem__(self, i):
-		return self.data[i], self.targets[i]
-
-	def to_numpy(self):
-		return self.data.numpy(), self.targets.numpy()

@@ -7,10 +7,12 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Local project import
-from datasets import load_all_images, BreastCTDataset
+from data_loader.data_loaders import load_all_images
+from data_loader.datasets import BreastCTDataset
 
 # pytorch
 from torch.utils.data import Dataset
+
 
 def draw_images(images : dict, image_idx=0):
 	fig, ax = plt.subplots(1, 3)
@@ -21,6 +23,7 @@ def draw_images(images : dict, image_idx=0):
 		i += 1
 	plt.show()
 
+
 def draw_data_targets(dataset : Dataset, image_idx=0):
 	data, targets = dataset.to_numpy()
 	fig, ax = plt.subplots(1, 2)
@@ -29,6 +32,7 @@ def draw_data_targets(dataset : Dataset, image_idx=0):
 	ax[1].imshow(targets[image_idx][0])
 	ax[1].set_title("Target")
 	plt.show()
+
 
 def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path="Figures"):
 	fig, ax = plt.subplots(2, 2, figsize=(14,10))
@@ -64,6 +68,7 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path="
 	plt.savefig("{}/pred_valid_{}".format(output_path, fig_id), bbox_inches='tight')
 	plt.close(fig)
 
+
 def draw_pixel_value_histogram(data : np.ndarray):
 	tmp_data = copy.deepcopy(data)
 	tmp_data = tmp_data.reshape(tmp_data.shape[0], tmp_data.shape[2], tmp_data.shape[3])
@@ -81,6 +86,7 @@ def draw_pixel_value_histogram(data : np.ndarray):
 	ax.set_xlim(min_val, max_val)
 	ax.set_yscale('log')
 	plt.show()
+
 
 if __name__ == '__main__':
 	train_images, test_images = load_all_images(n_batch=1)
