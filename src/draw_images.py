@@ -12,8 +12,6 @@ from datasets import load_all_images, BreastCTDataset
 # pytorch
 from torch.utils.data import Dataset
 
-
-
 def draw_images(images : dict, image_idx=0):
 	fig, ax = plt.subplots(1, 3)
 	i = 0
@@ -31,7 +29,6 @@ def draw_data_targets(dataset : Dataset, image_idx=0):
 	ax[1].imshow(targets[image_idx][0])
 	ax[1].set_title("Target")
 	plt.show()
-
 
 def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path="Figures"):
 	fig, ax = plt.subplots(2, 2, figsize=(14,10))
@@ -66,11 +63,28 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path="
 		os.path.makedirs(output_path)
 	plt.savefig("{}/pred_valid_{}".format(output_path, fig_id), bbox_inches='tight')
 	plt.close(fig)
-	#plt.show()
-	# return
+
+def draw_pixel_value_histogram(data : np.ndarray):
+	tmp_data = copy.deepcopy(data)
+	tmp_data = tmp_data.reshape(tmp_data.shape[0], tmp_data.shape[2], tmp_data.shape[3])
+	min_val = np.min(tmp_data)
+	max_val = np.max(tmp_data)
+	print(min_val, max_val)
+	hist_values = []
+	for i in range(tmp_data.shape[0]):
+		values, bin_edges = np.histogram(tmp_data[i], bins=100, range=(min_val, max_val))
+		hist_values.append(values)
+	hist_values = np.array(hist_values)
+	hist_values = np.sum(hist_values, axis=0)
+	fig, ax = plt.subplots()
+	ax.plot(bin_edges[:-1], hist_values, "bo")
+	ax.set_xlim(min_val, max_val)
+	ax.set_yscale('log')
+	plt.show()
 
 if __name__ == '__main__':
 	train_images, test_images = load_all_images(n_batch=1)
+	draw_pixel_value_histogram(train_images["FBP"])
 	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
 	draw_data_targets(breast_CT_dataset_train)
 	draw_images(train_images)
