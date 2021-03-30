@@ -12,15 +12,15 @@ import torch.nn.functional as F
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
-    def __init__(self, in_channels, out_channels, mid_channels=None):
+    def __init__(self, in_channels, out_channels, mid_channels=None, kernel_size=3):
         super().__init__()
         if not mid_channels:
             mid_channels = out_channels
         self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels, mid_channels, kernel_size=kernel_size, padding=1),
             nn.BatchNorm2d(mid_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
+            nn.Conv2d(mid_channels, out_channels, kernel_size=kernel_size, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
@@ -32,11 +32,11 @@ class DoubleConv(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, kernel_size=3):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
+            DoubleConv(in_channels, out_channels, kernel_size=kernel_size) 
         )
 
     def forward(self, x):
@@ -46,16 +46,19 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(self, in_channels, out_channels, bilinear=True):
+    def __init__(self, in_channels, out_channels, mode='bilinear', kernel_size=3):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
-        if bilinear:
+        if mode == 'bilinear':
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
+            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2, kernel_size=kernel_size)
+        elif mode == 'nearest':
+            self.up = nn.Upsample(scale_factor=2) # nearest neighbor
+            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2, kernel_size=kernel_size)
         else:
-            self.up = nn.ConvTranspose2d(in_channels , in_channels // 2, kernel_size=2, stride=2)
-            self.conv = DoubleConv(in_channels, out_channels)
+            self.up = nn.ConvTranspose2d(in_channels , in_channels // 2, kernel_size=2, stride=2) # Pas une bonne idée
+            self.conv = DoubleConv(in_channels, out_channels, kernel_size=kernel_size)
 
 
     def forward(self, x1, x2):
@@ -83,24 +86,23 @@ class OutConv(nn.Module):
 
 
 class UNet(nn.Module):
-
-    def __init__(self, n_channels, n_classes, bilinear=True):
+    def __init__(self, n_channels, n_classes, mode='bilinear', channels_depth_number=(64, 128, 256, 512, 1024), kernel_size=3):
         super(UNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
-        self.bilinear = bilinear
-
-        self.inc = DoubleConv(n_channels, 64)
-        self.down1 = Down(64, 128)
-        self.down2 = Down(128, 256)
-        self.down3 = Down(256, 512)
-        factor = 2 if bilinear else 1
-        self.down4 = Down(512, 1024 // factor)
-        self.up1 = Up(1024, 512 // factor, bilinear)
-        self.up2 = Up(512, 256 // factor, bilinear)
-        self.up3 = Up(256, 128 // factor, bilinear)
-        self.up4 = Up(128, 64, bilinear)
-        self.outc = OutConv(64, n_classes)
+        self.mode = mode
+        # diviser par 2 les channels. triple conv?
+        self.inc = DoubleConv(n_channels, channels_depth_number[0], kernel_size=kernel_size)
+        self.down1 = Down(channels_depth_number[0], channels_depth_number[1], kernel_size=kernel_size)
+        self.down2 = Down(channels_depth_number[1], channels_depth_number[2], kernel_size=kernel_size)
+        self.down3 = Down(channels_depth_number[2], channels_depth_number[3], kernel_size=kernel_size)
+        factor = 2 if mode == 'bilinear' else 1
+        self.down4 = Down(channels_depth_number[3], channels_depth_number[4] // factor, kernel_size=kernel_size)
+        self.up1 = Up(channels_depth_number[4], channels_depth_number[3] // factor, mode, kernel_size=kernel_size)
+        self.up2 = Up(channels_depth_number[3], channels_depth_number[2] // factor, mode, kernel_size=kernel_size)
+        self.up3 = Up(channels_depth_number[2], channels_depth_number[1] // factor, mode, kernel_size=kernel_size)
+        self.up4 = Up(channels_depth_number[1], channels_depth_number[0], mode, kernel_size=kernel_size)
+        self.outc = OutConv(channels_depth_number[0], n_classes)
 
     def forward(self, x):
         x1 = self.inc(x)

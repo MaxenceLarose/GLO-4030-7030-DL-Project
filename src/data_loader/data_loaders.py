@@ -30,17 +30,12 @@ def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 		f = gzip.GzipFile(file, "r")
 		batch = np.load(f)
 		data.append(batch)
-
 	data = np.concatenate(tuple(data))
-	#print(data.shape)
 	data = data.reshape(data.shape[0], 1, data.shape[1], data.shape[2])
-	#print(data.shape)
-	#print(data[0])
-	#exit(0)
 	return data
 
 
-def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,  normalize : bool=False) -> tuple:
+def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,  clip : bool=False) -> tuple:
 	"""
 	Read all the images located in the folder path. 
 	The dtype are already encoded in float32.
@@ -58,10 +53,8 @@ def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,
 	image_types = ["Sinogram", "FBP", "Phantom"]
 	for image_type in image_types:
 		tmp_images = load_images(image_type, n_batch=n_batch)
-		if normalize:
-			# Do we normalize each image individually or all at the same time?
-			tmp_images -= np.min(tmp_images)
-			tmp_images /= np.max(tmp_images)
+		if clip:
+			tmp_images = np.clip(tmp_images, 0, 1)
 		n_examples = tmp_images.shape[0]
 		train_images[image_type.upper()] = tmp_images[:int(train_split * n_examples)]
 		test_images[image_type.upper()] = tmp_images[int(train_split * n_examples):]
