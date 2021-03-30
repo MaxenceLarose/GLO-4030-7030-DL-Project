@@ -26,6 +26,7 @@ def train_network(
 		*,
 		optimizer: str = "Adam",
 		lr=0.001,
+		momentum=0.9,
 		weight_decay=0,
 		n_epoch=5,
 		batch_size=1,
@@ -61,7 +62,7 @@ def train_network(
 	if optimizer == "Adam":
 		opt = optim.Adam(unet.parameters(), lr=lr, weight_decay=weight_decay)
 	elif optimizer == "SGD":
-		opt = optim.SGD(unet.parameters(), lr=lr, weight_decay=weight_decay, momentum=0.9)
+		opt = optim.SGD(unet.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 	else:
 		raise RuntimeError("{} optimizer not available!".format(optimizer))
 	scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
@@ -127,6 +128,7 @@ if __name__ == '__main__':
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
 	lr = 0.001
+	momentum = 0.9
 	n_epoch = 100
 	batch_size = 1
 	weight_decay = 1e-4
@@ -154,11 +156,12 @@ if __name__ == '__main__':
 		breast_CT_dataset_train,
 		optimizer=optimizer,
 		lr=lr,
+		momentum=momentum,
 		weight_decay=weight_decay,
 		n_epoch=n_epoch,
 		batch_size=batch_size,
 		criterion=criterion,
-		use_gpu=False
+		use_gpu=True
 	)
 
 	# --------------------------------------------------------------------------------- #

@@ -18,7 +18,7 @@ def draw_images(images : dict, image_idx=0):
 	fig, ax = plt.subplots(1, 3)
 	i = 0
 	for image_type, image_data in images.items():
-		ax[i].imshow(image_data[image_idx])
+		ax[i].imshow(image_data[image_idx][0])
 		ax[i].set_title(image_type)
 		i += 1
 	plt.show()
@@ -64,7 +64,7 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path="
 	# ax[1].imshow(targets[image_idx][0])
 	# ax[1].set_title("MSE")
 	if not os.path.isdir(output_path):
-		os.path.makedirs(output_path)
+		os.makedirs(output_path)
 	plt.savefig("{}/pred_valid_{}".format(output_path, fig_id), bbox_inches='tight')
 	plt.close(fig)
 
