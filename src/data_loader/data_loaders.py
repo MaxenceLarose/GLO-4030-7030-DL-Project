@@ -35,7 +35,7 @@ def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 	return data
 
 
-def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,  clip : bool=False) -> tuple:
+def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,  clip : bool=False, load_sinograms=False) -> tuple:
 	"""
 	Read all the images located in the folder path. 
 	The dtype are already encoded in float32.
@@ -52,6 +52,8 @@ def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,
 	test_images = {}
 	image_types = ["Sinogram", "FBP", "Phantom"]
 	for image_type in image_types:
+		if not load_sinograms and image_type == "Sinogram":
+			continue
 		tmp_images = load_images(image_type, n_batch=n_batch)
 		if clip:
 			tmp_images = np.clip(tmp_images, 0, 1)
