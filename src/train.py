@@ -130,7 +130,7 @@ if __name__ == '__main__':
 	lr = 0.001
 	momentum = 0.9
 	n_epoch = 100
-	batch_size = 1
+	batch_size = 8
 	weight_decay = 1e-4
 	criterion = "MSELoss"
 	optimizer = "SGD"
@@ -145,7 +145,7 @@ if __name__ == '__main__':
 	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
 	# draw_data_targets(breast_CT_dataset_train)
 	# exit(0)
-	unet = UNet(1, 1)
+	unet = UNet(1, 1, channels_depth_number=(32, 64, 128, 256, 512), use_relu=False, mode='nearest', residual_block=True)
 	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet.parameters()])}")
 
 	# --------------------------------------------------------------------------------- #
