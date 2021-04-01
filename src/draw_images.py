@@ -13,6 +13,9 @@ from data_loader.datasets import BreastCTDataset
 # pytorch
 from torch.utils.data import Dataset
 
+from sklearn.metrics import mean_squared_error
+from skimage.metrics import structural_similarity
+
 
 def draw_images(images : dict, image_idx=0):
 	fig, ax = plt.subplots(1, 3)
@@ -34,40 +37,65 @@ def draw_data_targets(dataset : Dataset, image_idx=0):
 	plt.show()
 
 
-def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path="Figures"):
-	fig, ax = plt.subplots(2, 2, figsize=(14,10))
+def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=os.path.relpath("../Figures")):
+	fig, ax = plt.subplots(2, 3, figsize=(20,10))
 	size_split = 10
-	im1 = ax[0,0].imshow(inputs[image_idx][0], cmap='Greys')
+	input_image = inputs[image_idx][0]
+	target_image = targets[image_idx][0]
+	pred_image = pred[image_idx][0]
+
+	# input
+	im1 = ax[0,0].imshow(input_image, cmap='Greys')
 	divider1 = make_axes_locatable(ax[0,0])
 	cax1 = divider1.append_axes("right", size="{}%".format(size_split), pad=0.05)
 	cbar1 = plt.colorbar(im1, cax=cax1)
 	ax[0,0].set_title("Input")
 
-	im2 = ax[0,1].imshow(targets[image_idx][0], cmap='Greys')
+	# target
+	im2 = ax[0,1].imshow(target_image	, cmap='Greys')
 	divider2 = make_axes_locatable(ax[0,1])
 	cax2 = divider2.append_axes("right", size="{}%".format(size_split), pad=0.05)
 	cbar2 = plt.colorbar(im2, cax=cax2)
 	ax[0,1].set_title("Target")
 
-	im3 = ax[1,0].imshow(pred[image_idx][0], cmap='Greys')
+	# prediction
+	im3 = ax[1,0].imshow(pred_image, cmap='Greys')
 	divider3 = make_axes_locatable(ax[1,0])
 	cax3 = divider3.append_axes("right", size="{}%".format(size_split), pad=0.05)
 	cbar3 = plt.colorbar(im3, cax=cax3)
 	ax[1,0].set_title("Prediction")
 
-	diff_im = 100*(pred[image_idx][0] - targets[image_idx][0]) / targets[image_idx][0]
-	im4 = ax[1,1].imshow(diff_im, cmap='Greys', vmin=-5, vmax=5)
+	diff = pred_image - target_image
+	rmse = np.sqrt(np.mean((diff**2)))
+
+	# SSIM is defined for positive values
+	min_pred = np.min(pred_image)
+	pred_image -= min_pred	
+	target_image -= min_pred
+	mssim, ssim = structural_similarity(pred_image, target_image, full=True)
+	im4 = ax[1,1].imshow(ssim, cmap='Greys')
 	divider4 = make_axes_locatable(ax[1,1])
 	cax4 = divider4.append_axes("right", size="{}%".format(size_split), pad=0.05)
 	cbar4 = plt.colorbar(im4, cax=cax4)
-	ax[1,1].set_title("Rel Diff (%)")
-	# ax[1].imshow(targets[image_idx][0])
-	# ax[1].set_title("MSE")
+	ax[1,1].set_title("SSIM")
+	
+	# Diff
+	im5 = ax[0,2].imshow(diff, cmap='Greys')
+	divider5 = make_axes_locatable(ax[0,2])
+	cax5 = divider5.append_axes("right", size="{}%".format(size_split), pad=0.05)
+	cbar5 = plt.colorbar(im5, cax=cax5)
+	ax[0,2].set_title("Difference")
+
+	# Histogram of diff
+	ax[1,2].hist(diff, bins=100)
+	ax[1,2].set_xlabel("Difference")
+
+	#plt.show()
 	if not os.path.isdir(output_path):
 		os.makedirs(output_path)
 	plt.savefig("{}/pred_valid_{}".format(output_path, fig_id), bbox_inches='tight')
 	plt.close(fig)
-
+	return mssim, rmse
 
 def draw_pixel_value_histogram(data : np.ndarray):
 	tmp_data = copy.deepcopy(data)
