@@ -2,6 +2,8 @@ import logging
 import time
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 import torch.optim as optim
 import torch.nn as nn
 import torch
@@ -16,6 +18,11 @@ from model.metrics import validate
 from data_loader.data_loaders import load_all_images
 from data_loader.datasets import BreastCTDataset
 from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
+
+
+# from segmentation_models_pytorch import UnetPlusPlus
+# from segmentation_models_pytorch import Unet as smp_Unet
+# from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 
 # Fonction qui provient de la librairie deeplib (https://github.com/ulaval-damas/glo4030-labs/tree/master/deeplib)
@@ -56,7 +63,7 @@ def train_network(
 	history_callback = HistoryCallback()
 	history = History()
 	callbacks = [history_callback] if callbacks is None else [history_callback] + callbacks
-	train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size)
+	train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size, train_split=0.9)
 
 	# optimizer
 	if optimizer == "Adam":
@@ -104,8 +111,11 @@ def train_network(
 	#                            save validation images                                 #
 	# --------------------------------------------------------------------------------- #
 	image_idx = 0
+	valid_mssim = []
+	valid_rmse = []
 	with torch.no_grad():
 		for i, (inputs, targets) in enumerate(valid_loader):
+			print(i)
 			if use_gpu:
 				inputs = inputs.cuda()
 				targets = targets.cuda()
@@ -113,7 +123,15 @@ def train_network(
 			pred = pred.cpu().numpy()
 			inputs = inputs.cpu().numpy()
 			targets = targets.cpu().numpy()
-			draw_pred_target(inputs, targets, pred, image_idx=image_idx, fig_id=i)
+			mssim, rmse = draw_pred_target(inputs, targets, pred, image_idx=image_idx, fig_id=i)
+			valid_mssim.append(mssim)
+			valid_rmse.append(rmse)
+
+	fig, ax = plt.subplots(1,2)
+	ax[0].hist(valid_mssim, bins=20)
+	ax[0].set_title("SSIM")
+	ax[1].hist(valid_rmse, bins=20)
+	ax[1].set_title("RMSE")
 	return history
 
 
@@ -127,13 +145,14 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
-	lr = 0.001
+	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 100
-	batch_size = 8
-	weight_decay = 1e-4
+	n_epoch = 50
+	batch_size = 1
+	weight_decay = 0
 	criterion = "MSELoss"
-	optimizer = "SGD"
+	optimizer = "Adam"
+	batch_norm_momentum = 0.1
 	seed = 42
 
 	set_seed(seed)
@@ -145,9 +164,17 @@ if __name__ == '__main__':
 	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
 	# draw_data_targets(breast_CT_dataset_train)
 	# exit(0)
-	unet = UNet(1, 1, channels_depth_number=(32, 64, 128, 256, 512), use_relu=False, mode='nearest', residual_block=True)
+	unet = UNet(1, 1, 
+		channels_depth_number=(64, 128, 256, 512, 1024),
+		use_relu=False, # If False, then LeakyReLU 
+		mode='nearest', # For upsampling
+		residual_block=True, # skip connections?
+		batch_norm_momentum=batch_norm_momentum)
 	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet.parameters()])}")
 
+	# unet_plus_plus = UnetPlusPlus(in_channels=1, decoder_channels=(256, 128, 64, 32, 16), encoder_depth=5, encoder_weights='imagenet')
+	# logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet_plus_plus.parameters()])}")
+	# preprocess_input = get_preprocessing_fn('resnet34', pretrained='imagenet')
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
 	# --------------------------------------------------------------------------------- #

@@ -41,31 +41,32 @@ class DoubleConv(nn.Module):
 class DoubleConv2(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
-    def __init__(self, in_channels, out_channels, mid_channels=None, kernel_size=3, use_relu=True, stride=1, padding=1, residual_block=False):
+    def __init__(self, in_channels, out_channels, mid_channels=None, kernel_size=3, use_relu=True, stride=1, padding=1, residual_block=False, 
+        batch_norm_momentum=0.1):
         super().__init__()
         if not mid_channels:
             mid_channels = out_channels
         if use_relu:
             self.double_conv = nn.Sequential(
-                nn.BatchNorm2d(in_channels),
+                nn.BatchNorm2d(in_channels, momentum=batch_norm_momentum),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(in_channels, mid_channels, kernel_size=kernel_size, padding=padding, stride=stride),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(mid_channels, out_channels, kernel_size=kernel_size, padding=padding)
         )
         else:
             self.double_conv = nn.Sequential(
-                nn.BatchNorm2d(in_channels),
+                nn.BatchNorm2d(in_channels, momentum=batch_norm_momentum),
                 nn.LeakyReLU(inplace=True),
                 nn.Conv2d(in_channels, mid_channels, kernel_size=kernel_size, padding=padding, stride=stride),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum),
                 nn.LeakyReLU(inplace=True),
                 nn.Conv2d(mid_channels, out_channels, kernel_size=kernel_size, padding=padding)
         )
         if residual_block:
             self.skip = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.BatchNorm2d(out_channels)
+            nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
             )
         else:
             self.skip = None
@@ -79,21 +80,22 @@ class DoubleConv2(nn.Module):
 class DoubleConvIni(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
-    def __init__(self, in_channels, out_channels, mid_channels=None, kernel_size=3, use_relu=True, padding=1, residual_block=False):
+    def __init__(self, in_channels, out_channels, mid_channels=None, kernel_size=3, use_relu=True, padding=1, residual_block=False,
+        batch_norm_momentum=0.1):
         super().__init__()
         if not mid_channels:
             mid_channels = out_channels
         if use_relu:
             self.double_conv = nn.Sequential(
                 nn.Conv2d(in_channels, mid_channels, kernel_size=kernel_size, padding=padding),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(mid_channels, out_channels, kernel_size=kernel_size, padding=padding)
         )
         else:
             self.double_conv = nn.Sequential(
                 nn.Conv2d(in_channels, mid_channels, kernel_size=kernel_size, padding=padding),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum),
                 nn.LeakyReLU(inplace=True),
                 nn.Conv2d(mid_channels, out_channels, kernel_size=kernel_size, padding=padding)
         )
@@ -112,11 +114,11 @@ class DoubleConvIni(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(self, in_channels, out_channels, kernel_size=3, residual_block=False):
+    def __init__(self, in_channels, out_channels, kernel_size=3, residual_block=False, batch_norm_momentum=0.1):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             #nn.MaxPool2d(2),
-            DoubleConv2(in_channels, out_channels, kernel_size=kernel_size, stride=2, residual_block=residual_block)
+            DoubleConv2(in_channels, out_channels, kernel_size=kernel_size, stride=2, residual_block=residual_block, batch_norm_momentum=batch_norm_momentum)
         )
 
     def forward(self, x):
@@ -131,16 +133,16 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(self, in_channels, out_channels, mode='bilinear', kernel_size=3, residual_block=False):
+    def __init__(self, in_channels, out_channels, mode='bilinear', kernel_size=3, residual_block=False, batch_norm_momentum=0.1):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if mode == 'bilinear':
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv2(in_channels, out_channels, kernel_size=kernel_size, residual_block=residual_block)
+            self.conv = DoubleConv2(in_channels, out_channels, kernel_size=kernel_size, residual_block=residual_block, batch_norm_momentum=batch_norm_momentum)
         elif mode == 'nearest':
             self.up = nn.Upsample(scale_factor=2) # nearest neighbor, not working
-            self.conv = DoubleConv2(in_channels, out_channels, kernel_size=kernel_size, residual_block=residual_block)
+            self.conv = DoubleConv2(in_channels, out_channels, kernel_size=kernel_size, residual_block=residual_block, batch_norm_momentum=batch_norm_momentum)
         else:
             print("Not implemented")
             exit(0)
@@ -179,7 +181,7 @@ class OutConv(nn.Module):
 
 class UNet(nn.Module):
     def __init__(self, n_channels, n_classes, mode='bilinear', channels_depth_number=(64, 128, 256, 512, 1024), 
-        kernel_size=3, use_relu=True, residual_block=False):
+        kernel_size=3, use_relu=True, residual_block=False, batch_norm_momentum=0.1):
         super(UNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
