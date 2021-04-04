@@ -38,6 +38,7 @@ class DoubleConv(nn.Module):
     def forward(self, x):
         return self.double_conv(x)
 
+
 class DoubleConv2(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
@@ -76,6 +77,7 @@ class DoubleConv2(nn.Module):
             return self.double_conv(x)
         else:
             return self.double_conv(x) + self.skip(x)
+
 
 class DoubleConvIni(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
@@ -147,7 +149,6 @@ class Up(nn.Module):
             print("Not implemented")
             exit(0)
 
-
     def forward(self, x1, x2):
         #print("Up Forward")
         #print(x1.size())
@@ -180,8 +181,9 @@ class OutConv(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, n_channels, n_classes, mode='bilinear', channels_depth_number=(64, 128, 256, 512, 1024), 
-        kernel_size=3, use_relu=True, residual_block=False, batch_norm_momentum=0.1):
+    def __init__(self, n_channels, n_classes, mode='bilinear', channels_depth_number=(64, 128, 256, 512, 1024),
+                 kernel_size=3, use_relu=True, residual_block=False, batch_norm_momentum=0.1
+                 ):
         super(UNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
