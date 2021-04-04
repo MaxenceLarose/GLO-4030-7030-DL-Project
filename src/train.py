@@ -9,11 +9,14 @@ import torch.nn as nn
 import torch
 from model.unet import UNet
 from model.pretrained_unet import PretrainedUNet
+from model.segmentation_models import UNetSMP
+from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from deeplib.history import History
 from deeplib.training import HistoryCallback
 from deeplib.datasets import train_valid_loaders
 
+from utils.util import get_preprocessing
 from draw_images import draw_pred_target
 from model.metrics import validate
 from data_loader.data_loaders import load_all_images
@@ -21,13 +24,7 @@ from data_loader.datasets import BreastCTDataset
 from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
 
 
-# from segmentation_models_pytorch import UnetPlusPlus
-# from segmentation_models_pytorch import Unet as smp_Unet
-# from segmentation_models_pytorch.encoders import get_preprocessing_fn
-
-
 # Fonction qui provient de la librairie deeplib (https://github.com/ulaval-damas/glo4030-labs/tree/master/deeplib)
-# Le code a été adapté pour utiliser toutes les données mnist pour l'entrainement.
 def train_network(
 		network: nn.Module,
 		dataset,
@@ -159,27 +156,45 @@ if __name__ == '__main__':
 	set_seed(seed)
 
 	# --------------------------------------------------------------------------------- #
-	#                            dataset                                                #
+	#                            network                                                #
 	# --------------------------------------------------------------------------------- #
-	train_images, test_images = load_all_images(n_batch=4)
-	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
-	# draw_data_targets(breast_CT_dataset_train)
-	# exit(0)
-	unet = UNet(1, 1, 
-		channels_depth_number=(64, 128, 256, 512, 1024),
-		use_relu=False, # If False, then LeakyReLU 
-		mode='nearest', # For upsampling
-		residual_block=True, # skip connections?
-		batch_norm_momentum=batch_norm_momentum)
-	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet.parameters()])}")
 
-	# unet_plus_plus = UnetPlusPlus(in_channels=1, decoder_channels=(256, 128, 64, 32, 16), encoder_depth=5, encoder_weights='imagenet')
-	# logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet_plus_plus.parameters()])}")
-	# preprocess_input = get_preprocessing_fn('resnet34', pretrained='imagenet')
+	# Unet
+	unet = UNet(1, 1,
+				channels_depth_number=(64, 128, 256, 512, 1024),
+				use_relu=False,  # If False, then LeakyReLU
+				mode='nearest',  # For upsampling
+				residual_block=True,  # skip connections?
+				batch_norm_momentum=batch_norm_momentum)
+	preprocessing = None
 
+	# SMP Unet
+	# encoder = "resnet34"
+	# encoder_weights = "imagenet"
+	# activation = "sigmoid"
+	# unet = UNetSMP(unfreezed_layers=["decoder"],
+	# 			   encoder=encoder,
+	# 			   encoder_weights=encoder_weights,
+	# 			   activation=activation
+	# 			   )
+	# # preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
+	# preprocessing = None  # preprocessing still doesn't work
+
+	# Simple pretrained Unet
 	#     unet = PretrainedUNet(
 	#         1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
 	#     )
+	# preprocessing = None
+
+	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet.parameters()])}")
+
+	# --------------------------------------------------------------------------------- #
+	#                            dataset                                                #
+	# --------------------------------------------------------------------------------- #
+	train_images, test_images = load_all_images(n_batch=4)
+	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+	# draw_data_targets(breast_CT_dataset_train)
+	# exit(0)
 
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
