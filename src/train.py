@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import torch.optim as optim
 import torch.nn as nn
 import torch
-from model.model import UNet
+from model.unet import UNet
 
 from deeplib.history import History
 from deeplib.training import HistoryCallback
@@ -67,9 +67,9 @@ def train_network(
 
 	# optimizer
 	if optimizer == "Adam":
-		opt = optim.Adam(unet.parameters(), lr=lr, weight_decay=weight_decay)
+		opt = optim.Adam(network.parameters(), lr=lr, weight_decay=weight_decay)
 	elif optimizer == "SGD":
-		opt = optim.SGD(unet.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
+		opt = optim.SGD(network.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 	else:
 		raise RuntimeError("{} optimizer not available!".format(optimizer))
 	scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
