@@ -8,6 +8,7 @@ import torch.optim as optim
 import torch.nn as nn
 import torch
 from model.unet import UNet
+from model.pretrained_unet import PretrainedUNet
 
 from deeplib.history import History
 from deeplib.training import HistoryCallback
@@ -175,6 +176,11 @@ if __name__ == '__main__':
 	# unet_plus_plus = UnetPlusPlus(in_channels=1, decoder_channels=(256, 128, 64, 32, 16), encoder_depth=5, encoder_weights='imagenet')
 	# logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet_plus_plus.parameters()])}")
 	# preprocess_input = get_preprocessing_fn('resnet34', pretrained='imagenet')
+
+	#     unet = PretrainedUNet(
+	#         1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
+	#     )
+
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
 	# --------------------------------------------------------------------------------- #
