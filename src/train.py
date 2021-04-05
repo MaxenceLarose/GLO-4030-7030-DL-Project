@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from model.unet import UNet
 from model.nestedUnet import NestedUNet
 from model.pretrained_unet import PretrainedUNet
-from model.segmentation_models import UNetSMP
+from model.segmentation_models import UNetSMP, UNetPlusPLus
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from deeplib.history import History
@@ -181,20 +181,26 @@ if __name__ == '__main__':
 
 	# Nested Unet
 	unet = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
+	preprocessing = None
 
-	# preprocessing = None
-
-	# SMP Unet
+	# SMP UnetPLusPLus
 	# encoder = "resnet34"
 	# encoder_weights = "imagenet"
 	# activation = "sigmoid"
-	# unet = UNetSMP(unfreezed_layers=["decoder"],
-	# 			   encoder=encoder,
-	# 			   encoder_weights=encoder_weights,
-	# 			   activation=activation
-	# 			   )
-	# # preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
-	# preprocessing = None  # preprocessing still doesn't work
+	# preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
+	# if preprocessing:
+	# 	in_channels = 3
+	# else:
+	# 	in_channels = 1
+	#
+	# unet = UNetPlusPLus(
+	# 	unfreezed_layers=["decoder"],
+	# 	in_channels=in_channels,
+	# 	encoder=encoder,
+	# 	encoder_weights=encoder_weights,
+	# 	activation=activation
+	# )
+
 
 	# Simple pretrained Unet
 	#     unet = PretrainedUNet(
@@ -210,11 +216,11 @@ if __name__ == '__main__':
 	if load_data_for_challenge:
 		train_images, test_images = load_all_images(n_batch=4)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
-		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
-		breast_CT_dataset_valid_contest = BreastCTDataset(valid_images_contest, valid_images_contest)
+		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+		breast_CT_dataset_valid_contest = BreastCTDataset(valid_images_contest, valid_images_contest, preprocessing=preprocessing)
 	else:
 		train_images, test_images = load_all_images(n_batch=1)
-		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
+		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
 
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
