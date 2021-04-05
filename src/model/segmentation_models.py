@@ -51,6 +51,7 @@ class UNetPlusPLus(nn.Module):
                  in_channels: int,
                  encoder_depth: int = 5,
                  encoder: str = "resnet34",
+                 decoder_channels: tuple = (256, 128, 64, 32, 16),
                  encoder_weights: str = "imagenet",
                  activation: str = "sigmoid"
                  ):
@@ -60,6 +61,7 @@ class UNetPlusPLus(nn.Module):
                                       encoder_depth=encoder_depth,
                                       encoder_weights=encoder_weights,
                                       in_channels=in_channels,
+                                      decoder_channels=decoder_channels,
                                       activation=activation,
                                       )
 

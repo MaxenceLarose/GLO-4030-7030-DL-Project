@@ -77,7 +77,7 @@ def train_network(
 		opt = optim.SGD(network.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 	else:
 		raise RuntimeError("{} optimizer not available!".format(optimizer))
-	scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
+	scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=3)
 
 	# loss function
 	if criterion == "MSELoss":
@@ -90,34 +90,46 @@ def train_network(
 
 	n_batch = len(train_loader)
 	t0 = time.time()
-	for i_epoch in range(n_epoch):
-		network.train()
-		with torch.enable_grad():
-			for j, (inputs, targets) in enumerate(train_loader):
-				if use_gpu:
-					inputs = inputs.cuda()
-					targets = targets.cuda()
-				opt.zero_grad()
-				output = network(inputs)
-				batch_loss = loss(output, targets)
-				batch_loss.backward()
-				opt.step()
-				j += 1
-			# sys.stdout.write("%s[%s%s] %i/%i\r" % ("mini batch :", "#"*j, "."*(n_batch-j), j, n_batch))
-			# sys.stdout.flush()
-		train_loss, train_RMSE = validate(network, train_loader, loss, use_gpu=use_gpu)
-		valid_loss, valid_RMSE = validate(network, valid_loader, loss, use_gpu=use_gpu)
-		t1 = time.time()
-		scheduler.step(valid_loss)
-		lr = opt.param_groups[0]['lr']
-		history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
-		print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.3e} - Val RMSE: {valid_RMSE:.3e} - Train loss: {train_loss:.3e} - Val loss: {valid_loss:.3e} - lr: {lr:.2e}')
+	if not load_network_state:
+		best_RMSE = 1e9
+		for i_epoch in range(n_epoch):
+			network.train()
+			with torch.enable_grad():
+				for j, (inputs, targets) in enumerate(train_loader):
+					if use_gpu:
+						inputs = inputs.cuda()
+						targets = targets.cuda()
+					opt.zero_grad()
+					output = network(inputs)
+					batch_loss = loss(output, targets)
+					batch_loss.backward()
+					opt.step()
+					j += 1
+				# sys.stdout.write("%s[%s%s] %i/%i\r" % ("mini batch :", "#"*j, "."*(n_batch-j), j, n_batch))
+				# sys.stdout.flush()
+			train_loss, train_RMSE = validate(network, train_loader, loss, use_gpu=use_gpu)
+			valid_loss, valid_RMSE = validate(network, valid_loader, loss, use_gpu=use_gpu)
+			t1 = time.time()
+			scheduler.step(valid_loss)
+			lr = opt.param_groups[0]['lr']
+			history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
+			print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.3e} - Val RMSE: {valid_RMSE:.3e} - Train loss: {train_loss:.3e} - Val loss: {valid_loss:.3e} - lr: {lr:.2e}')
+			# --------------------------------------------------------------------------------- #
+			#                            save best model parameters                             #
+			# --------------------------------------------------------------------------------- #
+			if valid_RMSE < best_RMSE:
+				torch.save(network.state_dict(), "{}_best.pt".format(save_path))
+				best_RMSE = valid_RMSE
 		# --------------------------------------------------------------------------------- #
-		#                            save model                                             #
+		#                            save model at the end                                  #
 		# --------------------------------------------------------------------------------- #
-		torch.save(network.state_dict(), "{}.pt".format(save_path))
+		torch.save(network.state_dict(), "{}_end.pt".format(save_path))
+		network.load_state_dict(torch.load("{}_best.pt".format(save_path)))
+		network.eval()
+		if use_gpu:
+			network.cuda()
 	else:
-		network.load_state_dict(torch.load("{}.pt".format(save_path)))
+		network.load_state_dict(torch.load("{}_best.pt".format(save_path)))
 		network.eval()
 		if use_gpu:
 			network.cuda()
@@ -127,12 +139,12 @@ def train_network(
 	if dataset_test_challenge is not None:
 		test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
 		validate(network, test_loader, loss, use_gpu=use_gpu, save_data=True, output_path="data/challenge")
-		draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
+		#draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
 	# --------------------------------------------------------------------------------- #
 	#                            save validation images                                 #
 	# --------------------------------------------------------------------------------- #
 	validate(network, valid_loader, loss, use_gpu=use_gpu, save_data=True)
-	draw_all_preds_targets(network, valid_loader)
+	#draw_all_preds_targets(network, valid_loader)
 	return history
 
 
@@ -180,32 +192,33 @@ if __name__ == '__main__':
 	# 			batch_norm_momentum=batch_norm_momentum)
 
 	# Nested Unet
-	unet = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
-	preprocessing = None
+	#unet = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
 
 	# SMP UnetPLusPLus
-	# encoder = "resnet34"
-	# encoder_weights = "imagenet"
-	# activation = "sigmoid"
-	# preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
-	# if preprocessing:
-	# 	in_channels = 3
-	# else:
-	# 	in_channels = 1
-	#
-	# unet = UNetPlusPLus(
-	# 	unfreezed_layers=["decoder"],
-	# 	in_channels=in_channels,
-	# 	encoder=encoder,
-	# 	encoder_weights=encoder_weights,
-	# 	activation=activation
-	# )
+	encoder = "resnet34"
+	encoder_weights = "imagenet"
+	activation = None
+	decoder_channels=(256, 128, 64, 32, 16)
+	preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
+	if preprocessing:
+		in_channels = 3
+	else:
+		in_channels = 1
+	
+	unet = UNetPlusPLus(
+		unfreezed_layers=["encoder", "decoder"],
+		in_channels=in_channels,
+		encoder=encoder,
+		decoder_channels=decoder_channels,
+		encoder_weights=encoder_weights,
+		activation=activation
+	)
 
 
-	# Simple pretrained Unet
-	#     unet = PretrainedUNet(
-	#         1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
-	#     )
+	#Simple pretrained Unet
+	# unet = PretrainedUNet(
+	# 	1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
+	# 	)
 	# preprocessing = None
 
 	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet.parameters()])}")
@@ -214,7 +227,7 @@ if __name__ == '__main__':
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
 	if load_data_for_challenge:
-		train_images, test_images = load_all_images(n_batch=4)
+		train_images, test_images = load_all_images(n_batch=1)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
 		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
 		breast_CT_dataset_valid_contest = BreastCTDataset(valid_images_contest, valid_images_contest, preprocessing=preprocessing)
