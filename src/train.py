@@ -178,7 +178,7 @@ if __name__ == '__main__':
 	# 			mode=mode,  # For upsampling
 	# 			residual_block=residual_block,  # skip connections?
 	# 			batch_norm_momentum=batch_norm_momentum)
-	
+
 	# Nested Unet
 	unet = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
 
@@ -210,7 +210,7 @@ if __name__ == '__main__':
 	if load_data_for_challenge:
 		train_images, test_images = load_all_images(n_batch=4)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
-		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"][:100], train_images["PHANTOM"][:100])
+		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
 		breast_CT_dataset_valid_contest = BreastCTDataset(valid_images_contest, valid_images_contest)
 	else:
 		train_images, test_images = load_all_images(n_batch=1)
