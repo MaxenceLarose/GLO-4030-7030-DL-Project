@@ -8,6 +8,7 @@ import torch.optim as optim
 import torch.nn as nn
 import torch
 from model.unet import UNet
+from model.nestedUnet import NestedUNet
 from model.pretrained_unet import PretrainedUNet
 from model.segmentation_models import UNetSMP
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
@@ -19,7 +20,7 @@ from deeplib.datasets import train_valid_loaders
 from utils.util import get_preprocessing
 from draw_images import draw_pred_target
 from model.metrics import validate
-from data_loader.data_loaders import load_all_images
+from data_loader.data_loaders import load_all_images, load_images
 from data_loader.datasets import BreastCTDataset
 from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
 
@@ -107,14 +108,14 @@ def train_network(
 		t1 = time.time()
 		scheduler.step(valid_loss)
 		lr = opt.param_groups[0]['lr']
-			if lr < 1e-6:
-				torch.save(network.state_dict(), "{}_before_SGD.pt".format(save_path))
-				print("Changing to SGD")
-				lr = 1e-4
-				opt = optim.SGD(network.parameters(), lr=lr, weight_decay=weight_decay)
-				scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
-			history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
-			print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.3e} - Val RMSE: {valid_RMSE:.3e} - Train loss: {train_loss:.3e} - Val loss: {valid_loss:.3e} - lr: {lr:.2e}')
+		if lr < 1e-6:
+			torch.save(network.state_dict(), "{}_before_SGD.pt".format(save_path))
+			print("Changing to SGD")
+			lr = 1e-4
+			opt = optim.SGD(network.parameters(), lr=lr, weight_decay=weight_decay)
+			scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
+		history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
+		print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.3e} - Val RMSE: {valid_RMSE:.3e} - Train loss: {train_loss:.3e} - Val loss: {valid_loss:.3e} - lr: {lr:.2e}')
 		# --------------------------------------------------------------------------------- #
 		#                            save model                                             #
 		# --------------------------------------------------------------------------------- #

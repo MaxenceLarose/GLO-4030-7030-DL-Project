@@ -73,13 +73,13 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=o
 	se = (diff**2)
 	rmse = np.sqrt(np.mean(se))
 
-	# SSIM is defined for positive values
-	#min_pred = np.min(pred_image)
-	#pred_image -= min_pred	
-	#target_image -= min_pred
-	#mssim, ssim = structural_similarity(pred_image, target_image, full=True)
+	#SSIM is defined for positive values
+	min_pred = np.min(pred_image)
+	pred_image -= min_pred	
+	target_image -= min_pred
+	mssim, ssim = structural_similarity(pred_image, target_image, full=True)
 
-	im4 = ax[1,1].imshow(se, cmap='Greys')
+	im4 = ax[1,1].imshow(ssim, cmap='Greys')
 	divider4 = make_axes_locatable(ax[1,1])
 	cax4 = divider4.append_axes("right", size="{}%".format(size_split), pad=0.05)
 	cbar4 = plt.colorbar(im4, cax=cax4)
@@ -101,7 +101,7 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=o
 		os.makedirs(output_path)
 	plt.savefig(image_id, bbox_inches='tight')
 	plt.close(fig)
-	return np.mean(se), rmse
+	return mssim, rmse
 
 def draw_all_preds_targets(network, valid_loader, output_path=os.path.relpath("../Figures"), use_gpu=True):
 	image_idx = 0
