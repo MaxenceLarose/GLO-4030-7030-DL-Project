@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -7,6 +8,7 @@ import matplotlib.pyplot as plt
 import torch.optim as optim
 import torch.nn as nn
 import torch
+from torch.utils.data import DataLoader
 from model.unet import UNet
 from model.nestedUnet import NestedUNet
 from model.pretrained_unet import PretrainedUNet
@@ -18,7 +20,7 @@ from deeplib.training import HistoryCallback
 from deeplib.datasets import train_valid_loaders
 
 from utils.util import get_preprocessing
-from draw_images import draw_pred_target
+from draw_images import draw_pred_target, draw_all_preds_targets
 from model.metrics import validate
 from data_loader.data_loaders import load_all_images, load_images
 from data_loader.datasets import BreastCTDataset
@@ -108,12 +110,6 @@ def train_network(
 		t1 = time.time()
 		scheduler.step(valid_loss)
 		lr = opt.param_groups[0]['lr']
-		if lr < 1e-6:
-			torch.save(network.state_dict(), "{}_before_SGD.pt".format(save_path))
-			print("Changing to SGD")
-			lr = 1e-4
-			opt = optim.SGD(network.parameters(), lr=lr, weight_decay=weight_decay)
-			scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
 		history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
 		print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.3e} - Val RMSE: {valid_RMSE:.3e} - Train loss: {train_loss:.3e} - Val loss: {valid_loss:.3e} - lr: {lr:.2e}')
 		# --------------------------------------------------------------------------------- #
@@ -131,12 +127,12 @@ def train_network(
 	if dataset_test_challenge is not None:
 		test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
 		validate(network, test_loader, loss, use_gpu=use_gpu, save_data=True, output_path="data/challenge")
-		#draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
+		draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
 	# --------------------------------------------------------------------------------- #
 	#                            save validation images                                 #
 	# --------------------------------------------------------------------------------- #
 	validate(network, valid_loader, loss, use_gpu=use_gpu, save_data=True)
-	#draw_all_preds_targets(network, valid_loader)
+	draw_all_preds_targets(network, valid_loader)
 	return history
 
 
@@ -154,7 +150,7 @@ if __name__ == '__main__':
 	load_network_state = False
 	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 50
+	n_epoch = 1
 	batch_size = 1
 	weight_decay = 0
 	criterion = "MSELoss"
@@ -169,13 +165,15 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 
 	# Unet
-	unet = UNet(1, 1,
-				channels_depth_number=(64, 128, 256, 512, 1024),
-				use_relu=False,  # If False, then LeakyReLU
-				mode='nearest',  # For upsampling
-				residual_block=True,  # skip connections?
-				batch_norm_momentum=batch_norm_momentum)
-	preprocessing = None
+	# unet = UNet(1, 1,
+	# 			channels_depth_number=(64, 128, 256, 512, 1024),
+	# 			use_relu=False,  # If False, then LeakyReLU
+	# 			mode='nearest',  # For upsampling
+	# 			residual_block=True,  # skip connections?
+	# 			batch_norm_momentum=batch_norm_momentum)
+	# preprocessing = None
+
+	unet = NestedUNet(1,1)
 
 	# SMP Unet
 	# encoder = "resnet34"
@@ -203,7 +201,7 @@ if __name__ == '__main__':
 	if load_data_for_challenge:
 		train_images, test_images = load_all_images(n_batch=4)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
-		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
+		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"][:10], train_images["PHANTOM"][:10])
 		breast_CT_dataset_valid_contest = BreastCTDataset(valid_images_contest, valid_images_contest)
 	else:
 		train_images, test_images = load_all_images(n_batch=1)
