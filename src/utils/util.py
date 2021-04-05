@@ -1,5 +1,8 @@
 import albumentations as albu
-from torchvision.transforms.functional import to_tensor
+
+
+def to_tensor(x, **kwargs):
+    return x.transpose(2, 0, 1).astype('float32')
 
 
 def get_preprocessing(preprocessing_fn):

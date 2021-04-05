@@ -16,16 +16,18 @@ class UNetSMP(nn.Module):
 
     def __init__(self,
                  unfreezed_layers: list,
+                 in_channels: int,
+                 encoder_depth: int = 5,
                  encoder: str = "resnet34",
                  encoder_weights: str = "imagenet",
-                 activation: str = "sigmoid"
+                 activation: str = "sigmoid",
                  ):
         super().__init__()
 
         self.model = smp.Unet(encoder_name=encoder,
-                              encoder_depth=5,
+                              encoder_depth=encoder_depth,
                               encoder_weights=encoder_weights,
-                              in_channels=1,
+                              in_channels=in_channels,
                               activation=activation,
                               )
 
@@ -46,6 +48,8 @@ class UNetPlusPLus(nn.Module):
 
     def __init__(self,
                  unfreezed_layers: list,
+                 in_channels: int,
+                 encoder_depth: int = 5,
                  encoder: str = "resnet34",
                  encoder_weights: str = "imagenet",
                  activation: str = "sigmoid"
@@ -53,9 +57,9 @@ class UNetPlusPLus(nn.Module):
         super().__init__()
 
         self.model = smp.UnetPlusPlus(encoder_name=encoder,
-                                      encoder_depth=5,
+                                      encoder_depth=encoder_depth,
                                       encoder_weights=encoder_weights,
-                                      in_channels=1,
+                                      in_channels=in_channels,
                                       activation=activation,
                                       )
 
