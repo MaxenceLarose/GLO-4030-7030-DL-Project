@@ -26,10 +26,10 @@ from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
 
 # Fonction qui provient de la librairie deeplib (https://github.com/ulaval-damas/glo4030-labs/tree/master/deeplib)
 def train_network(
-		network: nn.Module,
+		network,
 		dataset,
 		*,
-		optimizer: str = "Adam",
+		optimizer="Adam",
 		lr=0.001,
 		momentum=0.9,
 		weight_decay=0,
@@ -37,7 +37,11 @@ def train_network(
 		batch_size=1,
 		use_gpu=True,
 		criterion="MSELoss",
-		callbacks=None
+		callbacks=None, 
+		save_path="model/model_state",
+		load_data_for_challenge=False,
+		dataset_test_challenge=None,
+		load_network_state=False
 ):
 	"""
 	Entraîne un réseau de neurones PyTorch avec Poutyne. On suppose que la sortie du réseau est compatible avec
@@ -103,33 +107,35 @@ def train_network(
 		t1 = time.time()
 		scheduler.step(valid_loss)
 		lr = opt.param_groups[0]['lr']
-		history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
-		print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.8f} - Val RMSE: {valid_RMSE:.8f} - Train loss: {train_loss:.8f} - Val loss: {valid_loss:.8f} - lr: {lr:.2e}')
+			if lr < 1e-6:
+				torch.save(network.state_dict(), "{}_before_SGD.pt".format(save_path))
+				print("Changing to SGD")
+				lr = 1e-4
+				opt = optim.SGD(network.parameters(), lr=lr, weight_decay=weight_decay)
+				scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
+			history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
+			print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.3e} - Val RMSE: {valid_RMSE:.3e} - Train loss: {train_loss:.3e} - Val loss: {valid_loss:.3e} - lr: {lr:.2e}')
+		# --------------------------------------------------------------------------------- #
+		#                            save model                                             #
+		# --------------------------------------------------------------------------------- #
+		torch.save(network.state_dict(), "{}.pt".format(save_path))
+	else:
+		network.load_state_dict(torch.load("{}.pt".format(save_path)))
+		network.eval()
+		if use_gpu:
+			network.cuda()
+	# --------------------------------------------------------------------------------- #
+	#                            save challenge images                                  #
+	# --------------------------------------------------------------------------------- #
+	if dataset_test_challenge is not None:
+		test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
+		validate(network, test_loader, loss, use_gpu=use_gpu, save_data=True, output_path="data/challenge")
+		#draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
 	# --------------------------------------------------------------------------------- #
 	#                            save validation images                                 #
 	# --------------------------------------------------------------------------------- #
-	image_idx = 0
-	valid_mssim = []
-	valid_rmse = []
-	with torch.no_grad():
-		for i, (inputs, targets) in enumerate(valid_loader):
-			print(i)
-			if use_gpu:
-				inputs = inputs.cuda()
-				targets = targets.cuda()
-			pred = network(inputs)
-			pred = pred.cpu().numpy()
-			inputs = inputs.cpu().numpy()
-			targets = targets.cpu().numpy()
-			mssim, rmse = draw_pred_target(inputs, targets, pred, image_idx=image_idx, fig_id=i)
-			valid_mssim.append(mssim)
-			valid_rmse.append(rmse)
-
-	fig, ax = plt.subplots(1,2)
-	ax[0].hist(valid_mssim, bins=20)
-	ax[0].set_title("SSIM")
-	ax[1].hist(valid_rmse, bins=20)
-	ax[1].set_title("RMSE")
+	validate(network, valid_loader, loss, use_gpu=use_gpu, save_data=True)
+	#draw_all_preds_targets(network, valid_loader)
 	return history
 
 
@@ -143,6 +149,8 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
+	load_data_for_challenge = True
+	load_network_state = False
 	lr = 0.0001
 	momentum = 0.9
 	n_epoch = 50
@@ -191,10 +199,14 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
-	train_images, test_images = load_all_images(n_batch=4)
-	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
-	# draw_data_targets(breast_CT_dataset_train)
-	# exit(0)
+	if load_data_for_challenge:
+		train_images, test_images = load_all_images(n_batch=4)
+		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
+		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
+		breast_CT_dataset_valid_contest = BreastCTDataset(valid_images_contest, valid_images_contest)
+	else:
+		train_images, test_images = load_all_images(n_batch=1)
+		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
 
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
@@ -209,7 +221,10 @@ if __name__ == '__main__':
 		n_epoch=n_epoch,
 		batch_size=batch_size,
 		criterion=criterion,
-		use_gpu=True
+		use_gpu=True,
+		dataset_test_challenge=breast_CT_dataset_valid_contest,
+		load_network_state=load_network_state,
+		save_path="model/model_state"
 	)
 
 	# --------------------------------------------------------------------------------- #

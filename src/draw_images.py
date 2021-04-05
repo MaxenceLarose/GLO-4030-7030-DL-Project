@@ -9,9 +9,11 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 # Local project import
 from data_loader.data_loaders import load_all_images
 from data_loader.datasets import BreastCTDataset
+import logging
 
 # pytorch
 from torch.utils.data import Dataset
+import torch
 
 from sklearn.metrics import mean_squared_error
 from skimage.metrics import structural_similarity
@@ -38,6 +40,8 @@ def draw_data_targets(dataset : Dataset, image_idx=0):
 
 
 def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=os.path.relpath("../Figures")):
+	image_id = "{}/pred_valid_{}".format(output_path, fig_id)
+	logging.info(f"Generating image {image_id}")
 	fig, ax = plt.subplots(2, 3, figsize=(20,10))
 	size_split = 10
 	input_image = inputs[image_idx][0]
@@ -66,14 +70,16 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=o
 	ax[1,0].set_title("Prediction")
 
 	diff = pred_image - target_image
-	rmse = np.sqrt(np.mean((diff**2)))
+	se = (diff**2)
+	rmse = np.sqrt(np.mean(se))
 
 	# SSIM is defined for positive values
-	min_pred = np.min(pred_image)
-	pred_image -= min_pred	
-	target_image -= min_pred
-	mssim, ssim = structural_similarity(pred_image, target_image, full=True)
-	im4 = ax[1,1].imshow(ssim, cmap='Greys')
+	#min_pred = np.min(pred_image)
+	#pred_image -= min_pred	
+	#target_image -= min_pred
+	#mssim, ssim = structural_similarity(pred_image, target_image, full=True)
+
+	im4 = ax[1,1].imshow(se, cmap='Greys')
 	divider4 = make_axes_locatable(ax[1,1])
 	cax4 = divider4.append_axes("right", size="{}%".format(size_split), pad=0.05)
 	cbar4 = plt.colorbar(im4, cax=cax4)
@@ -93,9 +99,33 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=o
 	#plt.show()
 	if not os.path.isdir(output_path):
 		os.makedirs(output_path)
-	plt.savefig("{}/pred_valid_{}".format(output_path, fig_id), bbox_inches='tight')
+	plt.savefig(image_id, bbox_inches='tight')
 	plt.close(fig)
-	return mssim, rmse
+	return np.mean(se), rmse
+
+def draw_all_preds_targets(network, valid_loader, output_path=os.path.relpath("../Figures"), use_gpu=True):
+	image_idx = 0
+	valid_mssim = []
+	valid_rmse = []
+	with torch.no_grad():
+		for i, (inputs, targets) in enumerate(valid_loader):
+			if use_gpu:
+				inputs = inputs.cuda()
+				targets = targets.cuda()
+			pred = network(inputs)
+			pred = pred.cpu().numpy()
+			inputs = inputs.cpu().numpy()
+			targets = targets.cpu().numpy()
+			for j in range(inputs.shape[0]):
+				mssim, rmse = draw_pred_target(inputs, targets, pred, image_idx=image_idx, fig_id=i*inputs.shape[0]+j, output_path=output_path)
+				valid_mssim.append(mssim)
+				valid_rmse.append(rmse)
+
+	fig, ax = plt.subplots(1,2)
+	ax[0].hist(valid_mssim, bins=20)
+	ax[0].set_title("MSE")
+	ax[1].hist(valid_rmse, bins=20)
+	ax[1].set_title("RMSE")
 
 def draw_pixel_value_histogram(data : np.ndarray):
 	tmp_data = copy.deepcopy(data)
@@ -114,11 +144,3 @@ def draw_pixel_value_histogram(data : np.ndarray):
 	ax.set_xlim(min_val, max_val)
 	ax.set_yscale('log')
 	plt.show()
-
-
-if __name__ == '__main__':
-	train_images, test_images = load_all_images(n_batch=1)
-	draw_pixel_value_histogram(train_images["FBP"])
-	breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
-	draw_data_targets(breast_CT_dataset_train)
-	draw_images(train_images)
