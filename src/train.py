@@ -146,34 +146,43 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
+	# training setup constants
 	load_data_for_challenge = True
 	load_network_state = False
 	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 1
+	n_epoch = 50
 	batch_size = 1
 	weight_decay = 0
 	criterion = "MSELoss"
 	optimizer = "Adam"
-	batch_norm_momentum = 0.1
-	seed = 42
 
+	# unet setup constants
+	nb_filter=(64, 128, 256, 512, 1024)
+	use_relu=False
+	mode='nearet'
+	residual_block=True
+	batch_norm_momentum = 0.01
+
+	#seed
+	seed = 42
 	set_seed(seed)
 
 	# --------------------------------------------------------------------------------- #
 	#                            network                                                #
 	# --------------------------------------------------------------------------------- #
-
 	# Unet
 	# unet = UNet(1, 1,
-	# 			channels_depth_number=(64, 128, 256, 512, 1024),
-	# 			use_relu=False,  # If False, then LeakyReLU
-	# 			mode='nearest',  # For upsampling
-	# 			residual_block=True,  # skip connections?
+	# 			channels_depth_number=nb_filter,
+	# 			use_relu=use_relu,  # If False, then LeakyReLU
+	# 			mode=mode,  # For upsampling
+	# 			residual_block=residual_block,  # skip connections?
 	# 			batch_norm_momentum=batch_norm_momentum)
-	# preprocessing = None
 
-	unet = NestedUNet(1,1)
+	# Nested Unet
+	unet = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
+
+	# preprocessing = None
 
 	# SMP Unet
 	# encoder = "resnet34"
@@ -201,7 +210,7 @@ if __name__ == '__main__':
 	if load_data_for_challenge:
 		train_images, test_images = load_all_images(n_batch=4)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
-		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"][:10], train_images["PHANTOM"][:10])
+		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"])
 		breast_CT_dataset_valid_contest = BreastCTDataset(valid_images_contest, valid_images_contest)
 	else:
 		train_images, test_images = load_all_images(n_batch=1)
