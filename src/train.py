@@ -77,7 +77,9 @@ def train_network(
 		opt = optim.SGD(network.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 	else:
 		raise RuntimeError("{} optimizer not available!".format(optimizer))
-	scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=3)
+	#scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=3)
+	scheduler = optim.lr_scheduler.ExponentialLR(opt, 0.94)
+
 
 	# loss function
 	if criterion == "MSELoss":
@@ -110,8 +112,11 @@ def train_network(
 			train_loss, train_RMSE = validate(network, train_loader, loss, use_gpu=use_gpu)
 			valid_loss, valid_RMSE = validate(network, valid_loader, loss, use_gpu=use_gpu)
 			t1 = time.time()
-			scheduler.step(valid_loss)
+			if i_epoch % 2 == 0 and i_epoch != 0:
+				scheduler.step()
 			lr = opt.param_groups[0]['lr']
+			if lr < 1e-6: 
+				opt.param_groups[0]['lr'] = 1e-6
 			history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
 			print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.3e} - Val RMSE: {valid_RMSE:.3e} - Train loss: {train_loss:.3e} - Val loss: {valid_loss:.3e} - lr: {lr:.2e}')
 			# --------------------------------------------------------------------------------- #
@@ -163,9 +168,9 @@ if __name__ == '__main__':
 	load_network_state = False
 	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 50
+	n_epoch = 100
 	batch_size = 1
-	weight_decay = 0
+	weight_decay = 1e-4
 	criterion = "MSELoss"
 	optimizer = "Adam"
 
@@ -180,6 +185,7 @@ if __name__ == '__main__':
 	seed = 42
 	set_seed(seed)
 
+	# data
 	# --------------------------------------------------------------------------------- #
 	#                            network                                                #
 	# --------------------------------------------------------------------------------- #
@@ -195,11 +201,13 @@ if __name__ == '__main__':
 	#unet = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
 
 	# SMP UnetPLusPLus
-	encoder = "resnet34"
+	encoder = "densenet121"
 	encoder_weights = "imagenet"
 	activation = None
-	decoder_channels=(256, 128, 64, 32, 16)
+	encoder_depth = 3
+	decoder_channels = (1024, 512, 256, 128, 64)
 	preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
+	#preprocessing = None
 	if preprocessing:
 		in_channels = 3
 	else:
@@ -209,6 +217,7 @@ if __name__ == '__main__':
 		unfreezed_layers=["encoder", "decoder"],
 		in_channels=in_channels,
 		encoder=encoder,
+		encoder_depth=encoder_depth,
 		decoder_channels=decoder_channels,
 		encoder_weights=encoder_weights,
 		activation=activation
@@ -219,7 +228,7 @@ if __name__ == '__main__':
 	# unet = PretrainedUNet(
 	# 	1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
 	# 	)
-	# preprocessing = None
+	#preprocessing = None
 
 	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet.parameters()])}")
 
@@ -227,7 +236,8 @@ if __name__ == '__main__':
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
 	if load_data_for_challenge:
-		train_images, test_images = load_all_images(n_batch=1)
+		train_images, test_images = load_all_images(image_types=["FBP", "Phantom", "Sinogram"], n_batch=4, 
+			multiple_channels=False, load_sinograms=False)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
 		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
 		breast_CT_dataset_valid_contest = BreastCTDataset(valid_images_contest, valid_images_contest, preprocessing=preprocessing)

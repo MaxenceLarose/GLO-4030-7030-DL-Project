@@ -22,20 +22,30 @@ def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 	return:	
 		The image dataset (ndarray)
 	"""
-	files = glob.glob(os.path.join(path, "{}*.npy.gz".format(image_type)))
+	files = glob.glob(os.path.join(path, "{}*.npy*".format(image_type)))
 	data = []
 	logging.info(f"\n{'-' * 25}\nLoading {image_type}\n{'-' * 25}")
 	for file in files[:n_batch]:
 		logging.info(f"Loading file {file}")
-		f = gzip.GzipFile(file, "r")
-		batch = np.load(f)
+		try:
+			f = gzip.GzipFile(file, "r")
+			batch = np.load(f)
+			f.close()
+		except:
+			batch = np.load(file)
 		data.append(batch)
 	data = np.concatenate(tuple(data))
 	data = data.reshape(data.shape[0], 1, data.shape[1], data.shape[2])
 	return data
 
 
-def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,  clip : bool=False, load_sinograms=False) -> tuple:
+def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"], 
+	path : str="data", 
+	n_batch : int=4, 
+	train_split : float=0.9,  
+	clip : bool=False, 
+	load_sinograms=False,
+	multiple_channels=False) -> tuple:
 	"""
 	Read all the images located in the folder path. 
 	The dtype are already encoded in float32.
@@ -50,7 +60,7 @@ def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,
 	"""
 	train_images = {}
 	test_images = {}
-	image_types = ["Sinogram", "FBP", "Phantom"]
+	
 	for image_type in image_types:
 		if not load_sinograms and image_type == "Sinogram":
 			continue
@@ -60,4 +70,11 @@ def load_all_images(path : str="data", n_batch : int=4, train_split : float=0.9,
 		n_examples = tmp_images.shape[0]
 		train_images[image_type.upper()] = tmp_images[:int(train_split * n_examples)]
 		test_images[image_type.upper()] = tmp_images[int(train_split * n_examples):]
+	if multiple_channels and "RECLEO" in train_images.keys():
+		train_images["FBP"] = np.concatenate((train_images["FBP"], train_images["RECLEO"]), axis=1)
+		test_images["FBP"] = np.concatenate((test_images["FBP"], test_images["RECLEO"]), axis=1)
+	if "RECLEO" in train_images.keys() and not multiple_channels:
+		train_images["FBP"] = np.concatenate((train_images["FBP"], train_images["RECLEO"]), axis=0)
+		test_images["FBP"] = np.concatenate((test_images["FBP"], test_images["RECLEO"]), axis=0)
+	print(train_images["FBP"].shape)
 	return train_images, test_images
