@@ -1,6 +1,7 @@
 import logging
 import time
 import os
+import warnings
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -13,6 +14,7 @@ from model.unet import UNet
 from model.nestedUnet import NestedUNet
 from model.pretrained_unet import PretrainedUNet
 from model.segmentation_models import UNetSMP, UNetPlusPLus
+from model.RED_CNN import PretrainedREDCNN
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from deeplib.history import History
@@ -192,58 +194,71 @@ if __name__ == '__main__':
 	seed = 42
 	set_seed(seed)
 
-	# data
 	# --------------------------------------------------------------------------------- #
 	#                            network                                                #
 	# --------------------------------------------------------------------------------- #
-	# Unet
-	unet = UNet(1, 1,
-				channels_depth_number=nb_filter,
-				use_relu=use_relu,  # If False, then LeakyReLU
-				mode=mode,  # For upsampling
-				residual_block=residual_block,  # skip connections?
-				batch_norm_momentum=batch_norm_momentum)
+	available_networks = [
+		"UNet",
+		"NestedUNet",
+		"SMP UnetPLusPLus",
+		"Pretrained Simple UNet",
+		"Pretrained RED_CNN"
+	]
 
-	# Nested Unet
-	#unet = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
+	network_to_use: str = "UNet"
 
-	# SMP UnetPLusPLus
-	# encoder = "densenet121"
-	# encoder_weights = "imagenet"
-	# activation = None
-	# encoder_depth = 5
-	# decoder_channels = (1024, 512, 256, 128, 64)
-	# preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
-	# #preprocessing = None
-	# if preprocessing:
-	# 	in_channels = 3
-	# else:
-	# 	in_channels = 1
-	
-	# unet = UNetPlusPLus(
-	# 	unfreezed_layers=["encoder", "decoder"],
-	# 	in_channels=in_channels,
-	# 	encoder=encoder,
-	# 	encoder_depth=encoder_depth,
-	# 	decoder_channels=decoder_channels,
-	# 	encoder_weights=encoder_weights,
-	# 	activation=activation
-	# )
+	if network_to_use not in available_networks:
+		raise NotImplementedError(f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
+	elif network_to_use is "UNet":
+		model = UNet(1, 1,
+					channels_depth_number=nb_filter,
+					use_relu=use_relu,  # If False, then LeakyReLU
+					mode=mode,  # For upsampling
+					residual_block=residual_block,  # skip connections?
+					batch_norm_momentum=batch_norm_momentum)
+		preprocessing = None
+	elif network_to_use is "NestedUNet":
+		model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
+		preprocessing = None
+	elif network_to_use is "SMP UnetPLusPLus":
+		encoder = "densenet121"
+		encoder_weights = "imagenet"
+		activation = "logits"
+		encoder_depth = 5
+		decoder_channels = (1024, 512, 256, 128, 64)
+		preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
+		if preprocessing:
+			in_channels = 3
+		else:
+			in_channels = 1
 
+		model = UNetPlusPLus(
+			unfreezed_layers=["encoder", "decoder"],
+			in_channels=in_channels,
+			encoder=encoder,
+			encoder_depth=encoder_depth,
+			decoder_channels=decoder_channels,
+			encoder_weights=encoder_weights,
+			activation=activation
+		)
+	elif network_to_use is "Pretrained Simple UNet":
+		model = PretrainedUNet(
+			1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
+		)
+		preprocessing = None
+	elif network_to_use is "Pretrained RED_CNN":
+		model = PretrainedREDCNN(unfreezed_layers=["conv", "tconv"])
+		preprocessing = None
+	else:
+		warnings.warn("Something very wrong happened")
 
-	#Simple pretrained Unet
-	# unet = PretrainedUNet(
-	# 	1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
-	# 	)
-	preprocessing = None
-
-	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet.parameters()])}")
+	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in model.parameters()])}")
 
 	# --------------------------------------------------------------------------------- #
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
 	if load_data_for_challenge:
-		train_images, test_images = load_all_images(image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1, 
+		train_images, test_images = load_all_images(image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1,
 			multiple_channels=False, load_sinograms=False, merge_datasets=False)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
 		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
@@ -258,7 +273,7 @@ if __name__ == '__main__':
 	#                           network training                                        #
 	# --------------------------------------------------------------------------------- #
 	history = train_network(
-		unet,
+		model,
 		aapm_dataset,
 		optimizer=optimizer,
 		lr=lr,
