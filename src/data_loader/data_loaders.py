@@ -45,7 +45,8 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 	train_split : float=0.9,  
 	clip : bool=False, 
 	load_sinograms=False,
-	multiple_channels=False) -> tuple:
+	multiple_channels=False,
+	merge_datasets=False) -> tuple:
 	"""
 	Read all the images located in the folder path. 
 	The dtype are already encoded in float32.
@@ -74,7 +75,25 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 		train_images["FBP"] = np.concatenate((train_images["FBP"], train_images["RECLEO"]), axis=1)
 		test_images["FBP"] = np.concatenate((test_images["FBP"], test_images["RECLEO"]), axis=1)
 	if "RECLEO" in train_images.keys() and not multiple_channels:
-		train_images["FBP"] = np.concatenate((train_images["FBP"], train_images["RECLEO"]), axis=0)
-		test_images["FBP"] = np.concatenate((test_images["FBP"], test_images["RECLEO"]), axis=0)
+		if merge_datasets:
+			train_images["FBP"] = np.concatenate((train_images["FBP"], train_images["RECLEO"]), axis=0)
+			test_images["FBP"] = np.concatenate((test_images["FBP"], test_images["RECLEO"]), axis=0)
+	if "VIRTUAL_BREAST" in train_images.keys():
+		try:
+			if merge_datasets:
+				train_images["PHANTOM"] = np.concatenate((train_images["PHANTOM"], train_images["VIRTUAL_BREAST"]), axis=0)
+				test_images["PHANTOM"] = np.concatenate((test_images["PHANTOM"], test_images["VIRTUAL_BREAST"]), axis=0)
+		except KeyError:
+			train_images["PHANTOM"] = train_images["VIRTUAL_BREAST"]
+			test_images["PHANTOM"] = test_images["VIRTUAL_BREAST"]
+	if "FDK" in train_images.keys():
+		try:
+			if merge_datasets:
+				train_images["FBP"] = np.concatenate((train_images["FBP"], train_images["FDK"]), axis=0)
+				test_images["FBP"] = np.concatenate((test_images["FBP"], test_images["FDK"]), axis=0)
+		except KeyError:
+			train_images["FBP"] = train_images["FDK"]
+			test_images["FBP"] = test_images["FDK"]
 	print(train_images["FBP"].shape)
+
 	return train_images, test_images

@@ -17,13 +17,13 @@ from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from deeplib.history import History
 from deeplib.training import HistoryCallback
-from deeplib.datasets import train_valid_loaders
+#from deeplib.datasets import train_valid_loaders
 
 from utils.util import get_preprocessing
 from draw_images import draw_pred_target, draw_all_preds_targets
 from model.metrics import validate
 from data_loader.data_loaders import load_all_images, load_images
-from data_loader.datasets import BreastCTDataset
+from data_loader.datasets import BreastCTDataset, train_valid_loaders
 from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
 
 
@@ -41,10 +41,11 @@ def train_network(
 		use_gpu=True,
 		criterion="MSELoss",
 		callbacks=None, 
-		save_path="model/model_state",
+		save_path="model/entire_model",
 		load_data_for_challenge=False,
 		dataset_test_challenge=None,
-		load_network_state=False
+		load_network_state=False,
+		leonardo_dataset=None
 ):
 	"""
 	Entraîne un réseau de neurones PyTorch avec Poutyne. On suppose que la sortie du réseau est compatible avec
@@ -68,7 +69,12 @@ def train_network(
 	history_callback = HistoryCallback()
 	history = History()
 	callbacks = [history_callback] if callbacks is None else [history_callback] + callbacks
-	train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size, train_split=0.9)
+	if leonardo_dataset is not None:
+		train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size, valid_dataset=leonardo_dataset)
+
+	else:
+		train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size, train_split=0.9)
+
 
 	# optimizer
 	if optimizer == "Adam":
@@ -112,11 +118,9 @@ def train_network(
 			train_loss, train_RMSE = validate(network, train_loader, loss, use_gpu=use_gpu)
 			valid_loss, valid_RMSE = validate(network, valid_loader, loss, use_gpu=use_gpu)
 			t1 = time.time()
-			if i_epoch % 2 == 0 and i_epoch != 0:
-				scheduler.step()
 			lr = opt.param_groups[0]['lr']
-			if lr < 1e-6: 
-				opt.param_groups[0]['lr'] = 1e-6
+			if i_epoch % 2 == 0 and i_epoch != 0 and lr > 1e-5:
+				scheduler.step()
 			history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
 			print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.3e} - Val RMSE: {valid_RMSE:.3e} - Train loss: {train_loss:.3e} - Val loss: {valid_loss:.3e} - lr: {lr:.2e}')
 			# --------------------------------------------------------------------------------- #
@@ -128,13 +132,13 @@ def train_network(
 		# --------------------------------------------------------------------------------- #
 		#                            save model at the end                                  #
 		# --------------------------------------------------------------------------------- #
-		torch.save(network.state_dict(), "{}_end.pt".format(save_path))
-		network.load_state_dict(torch.load("{}_best.pt".format(save_path)))
+		torch.save(network, "{}_end.pt".format(save_path))
+		network = torch.load("{}_best.pt".format(save_path))
 		network.eval()
 		if use_gpu:
 			network.cuda()
 	else:
-		network.load_state_dict(torch.load("{}_best.pt".format(save_path)))
+		network = torch.load("{}_best.pt".format(save_path))
 		network.eval()
 		if use_gpu:
 			network.cuda()
@@ -166,7 +170,7 @@ if __name__ == '__main__':
 	# training setup constants
 	load_data_for_challenge = True
 	load_network_state = False
-	lr = 0.0001
+	lr = 0.0002
 	momentum = 0.9
 	n_epoch = 100
 	batch_size = 1
@@ -177,9 +181,12 @@ if __name__ == '__main__':
 	# unet setup constants
 	nb_filter=(64, 128, 256, 512, 1024)
 	use_relu=False
-	mode='nearet'
+	mode='nearest'
 	residual_block=True
-	batch_norm_momentum = 0.01
+	if batch_size == 1:
+		batch_norm_momentum = 0.01
+	else:
+		batch_norm_momentum = 0.05
 
 	#seed
 	seed = 42
@@ -190,45 +197,45 @@ if __name__ == '__main__':
 	#                            network                                                #
 	# --------------------------------------------------------------------------------- #
 	# Unet
-	# unet = UNet(1, 1,
-	# 			channels_depth_number=nb_filter,
-	# 			use_relu=use_relu,  # If False, then LeakyReLU
-	# 			mode=mode,  # For upsampling
-	# 			residual_block=residual_block,  # skip connections?
-	# 			batch_norm_momentum=batch_norm_momentum)
+	unet = UNet(1, 1,
+				channels_depth_number=nb_filter,
+				use_relu=use_relu,  # If False, then LeakyReLU
+				mode=mode,  # For upsampling
+				residual_block=residual_block,  # skip connections?
+				batch_norm_momentum=batch_norm_momentum)
 
 	# Nested Unet
 	#unet = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
 
 	# SMP UnetPLusPLus
-	encoder = "densenet121"
-	encoder_weights = "imagenet"
-	activation = None
-	encoder_depth = 3
-	decoder_channels = (1024, 512, 256, 128, 64)
-	preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
-	#preprocessing = None
-	if preprocessing:
-		in_channels = 3
-	else:
-		in_channels = 1
+	# encoder = "densenet121"
+	# encoder_weights = "imagenet"
+	# activation = None
+	# encoder_depth = 5
+	# decoder_channels = (1024, 512, 256, 128, 64)
+	# preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
+	# #preprocessing = None
+	# if preprocessing:
+	# 	in_channels = 3
+	# else:
+	# 	in_channels = 1
 	
-	unet = UNetPlusPLus(
-		unfreezed_layers=["encoder", "decoder"],
-		in_channels=in_channels,
-		encoder=encoder,
-		encoder_depth=encoder_depth,
-		decoder_channels=decoder_channels,
-		encoder_weights=encoder_weights,
-		activation=activation
-	)
+	# unet = UNetPlusPLus(
+	# 	unfreezed_layers=["encoder", "decoder"],
+	# 	in_channels=in_channels,
+	# 	encoder=encoder,
+	# 	encoder_depth=encoder_depth,
+	# 	decoder_channels=decoder_channels,
+	# 	encoder_weights=encoder_weights,
+	# 	activation=activation
+	# )
 
 
 	#Simple pretrained Unet
 	# unet = PretrainedUNet(
 	# 	1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
 	# 	)
-	#preprocessing = None
+	preprocessing = None
 
 	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in unet.parameters()])}")
 
@@ -236,21 +243,23 @@ if __name__ == '__main__':
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
 	if load_data_for_challenge:
-		train_images, test_images = load_all_images(image_types=["FBP", "Phantom", "Sinogram"], n_batch=4, 
-			multiple_channels=False, load_sinograms=False)
+		train_images, test_images = load_all_images(image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1, 
+			multiple_channels=False, load_sinograms=False, merge_datasets=False)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
-		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
-		breast_CT_dataset_valid_contest = BreastCTDataset(valid_images_contest, valid_images_contest, preprocessing=preprocessing)
+		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+		aapm_dataset_valid = BreastCTDataset(valid_images_contest, valid_images_contest, preprocessing=preprocessing)
+		leonardo_dataset = BreastCTDataset(train_images["FDK"][:100], train_images["VIRTUAL_BREAST"][:100], preprocessing=preprocessing)
 	else:
 		train_images, test_images = load_all_images(n_batch=1)
-		breast_CT_dataset_train = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+		leonardo_dataset = BreastCTDataset(train_images["FDK"], train_images["VIRTUAL_BREAST"], preprocessing=preprocessing)
 
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
 	# --------------------------------------------------------------------------------- #
 	history = train_network(
 		unet,
-		breast_CT_dataset_train,
+		aapm_dataset,
 		optimizer=optimizer,
 		lr=lr,
 		momentum=momentum,
@@ -259,9 +268,10 @@ if __name__ == '__main__':
 		batch_size=batch_size,
 		criterion=criterion,
 		use_gpu=True,
-		dataset_test_challenge=breast_CT_dataset_valid_contest,
+		dataset_test_challenge=aapm_dataset_valid,
 		load_network_state=load_network_state,
-		save_path="model/model_state"
+		save_path="model/model_state",
+		leonardo_dataset=leonardo_dataset
 	)
 
 	# --------------------------------------------------------------------------------- #
