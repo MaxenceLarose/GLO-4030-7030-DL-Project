@@ -1,7 +1,12 @@
-import torch
-import torch.nn as nn
 import numpy as np
 from typing import Tuple, List, Dict
+import logging
+import pprint
+
+import poutyne as pt
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
 
 
 class WeightedAverage(object):
@@ -26,7 +31,7 @@ class WeightedAverage(object):
 
         return weights
 
-    def eval(self, x):
+    def evaluate_generator(self, x):
         self.weights = self.get_model_specific_weighted()
         self.conv1.weight = torch.nn.Parameter(torch.from_numpy(self.weights))
         out = self.conv1(x)
@@ -73,7 +78,7 @@ class CNNVote(nn.Module):
 
 
 class VotingEnsemble(object):
-    def __init__(self, method: str):
+    def __init__(self, method: str, loss_rmse: list, input_shape: tuple, output_shape: int, **kwargs):
         """
         Constructor of the class VotingEnsemble.
 
@@ -84,15 +89,91 @@ class VotingEnsemble(object):
             None
         """
         super().__init__()
-        available_methods = [
+
+        self.available_methods = [
             "WeightedAverage",
             "FCLayers",
             "CNN"
         ]
 
-        if method not in available_methods:
-            raise NotImplementedError(f"Chosen network isn't implemented \nImplemented networks are "
-                                      f"{available_methods}.")
-        else:
-            self.method = method
+        self.loss_rmse = loss_rmse
+        self.input_shape = input_shape
+        self.output_shape = output_shape
+        self.kwargs = kwargs
+        self.network = None
 
+        self._method = method
+
+    @property
+    def method(self) -> str:
+        return self._method
+
+    @method.setter
+    def method(self, method: str):
+        if method not in self.available_methods:
+            raise NotImplementedError(f"Chosen network isn't implemented \nImplemented networks are "
+                                      f"{self.available_methods}.")
+
+        elif method == self.available_methods[0]:
+            self.network = WeightedAverage(
+                loss_rmse=self.loss_rmse,
+                input_shape=self.input_shape
+            )
+
+        elif method == self.available_methods[1]:
+            self.network = FCLayersVote(
+                input_shape=self.input_shape,
+                output_shape=self.output_shape
+            )
+
+        elif method == self.available_methods[2]:
+            self.network = CNNVote(
+                input_shape=self.input_shape,
+                kernel_size=self.kwargs.get("kernel_size", 1),
+                padding=self.kwargs.get("padding", 0),
+            )
+
+        self._method = method
+
+    def train_and_test_network(
+            self,
+            loaders: Dict[str, DataLoader],
+            **training_kwargs
+    ) -> Tuple[list, tuple]:
+        if self._method == self.available_methods[0]:
+            logging.info(f"The {self._method} doesn't require training.")
+            model = self.network
+
+            test_metrics = model.evaluate_generator(loaders["test"])
+
+            return None, test_metrics
+
+        else:
+            params = [p for p in self.network.parameters() if p.requires_grad]
+            if len(params) == 0:
+                exec_training = False
+            else:
+                exec_training = True
+
+            if exec_training:
+                optimizer = torch.optim.Adam(
+                    params,
+                    lr=training_kwargs.get("lr", 1e-3),
+                    weight_decay=1e-3,
+                )
+                model = pt.Model(self.network, optimizer, 'MSELoss', batch_metrics=['accuracy'])
+                if torch.cuda.is_available():
+                    model.cuda()
+
+                scheduler = pt.ReduceLROnPlateau(monitor='loss', mode="min", patience=3, factor=0.5, verbose=True)
+
+                history = model.fit_generator(
+                    loaders["train"],
+                    loaders["valid"],
+                    epochs=training_kwargs.get("epochs", 5),
+                    callbacks=[scheduler],
+                )
+                logging.info(f"history: \n{pprint.pformat(history, indent=4)}")
+                test_metrics = model.evaluate_generator(loaders["test"])
+
+                return history, test_metrics
