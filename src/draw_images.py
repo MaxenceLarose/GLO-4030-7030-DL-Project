@@ -75,7 +75,7 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=o
 
 	#SSIM is defined for positive values
 	min_pred = np.min(pred_image)
-	pred_image -= min_pred	
+	pred_image -= min_pred
 	target_image -= min_pred
 	mssim, ssim = structural_similarity(pred_image, target_image, full=True)
 
@@ -84,7 +84,7 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=o
 	cax4 = divider4.append_axes("right", size="{}%".format(size_split), pad=0.05)
 	cbar4 = plt.colorbar(im4, cax=cax4)
 	ax[1,1].set_title("SSIM")
-	
+
 	# Diff
 	im5 = ax[0,2].imshow(diff, cmap='Greys')
 	divider5 = make_axes_locatable(ax[0,2])
