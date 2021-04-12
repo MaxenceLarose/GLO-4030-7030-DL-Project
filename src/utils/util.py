@@ -71,14 +71,6 @@ def save_diff_dataset(path : str="data", n_batch=4):
             f.close()
         except:
             fbp = np.load(file)
-        file = glob.glob(os.path.join(path, "DIFF_batch{}.npy*".format(batch)))[0]
-        logging.info(f"Loading file {file}")
-        try:
-            f = gzip.GzipFile(file, "r")
-            diff = np.load(f)
-            f.close()
-        except:
-            diff = np.load(file)
         file = "./{}/DIFF_batch{}.npy".format(path, batch)
         np.save(file, phantom - fbp)
         logging.info(f"Pĥantom and FBP difference for batch {batch} saved to file {file}")
