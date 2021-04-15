@@ -18,8 +18,9 @@ from model.RED_CNN import PretrainedREDCNN
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from deeplib.history import History
-from deeplib.training import HistoryCallback
+from deeplib.training import HistoryCallback, get_model
 #from deeplib.datasets import train_valid_loaders
+from poutyne import ModelCheckpoint
 
 from utils.util import get_preprocessing
 from draw_images import draw_pred_target, draw_all_preds_targets
@@ -42,7 +43,7 @@ def train_network(
 		batch_size=1,
 		use_gpu=True,
 		criterion="MSELoss",
-		callbacks=None, 
+		callbacks=None,
 		save_path="model/entire_model",
 		load_data_for_challenge=False,
 		dataset_test_challenge=None,
@@ -69,14 +70,13 @@ def train_network(
 		Retourne un objet de type `deeplib.history.History` contenant l'historique d'entraînement.
 	"""
 	history_callback = HistoryCallback()
-	history = History()
-	callbacks = [history_callback] if callbacks is None else [history_callback] + callbacks
+	checkpoint_callback = ModelCheckpoint("{}_best.pt".format(save_path), save_best_only=True)
+	callbacks = [history_callback, checkpoint_callback] if callbacks is None else [history_callback, checkpoint_callback] + callbacks
 	if leonardo_dataset is not None:
 		train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size, valid_dataset=leonardo_dataset)
 
 	else:
 		train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size, train_split=0.9)
-
 
 	# optimizer
 	if optimizer == "Adam":
@@ -88,59 +88,32 @@ def train_network(
 	#scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=3)
 	scheduler = optim.lr_scheduler.ExponentialLR(opt, 0.94)
 
-
 	# loss function
 	if criterion == "MSELoss":
 		loss = nn.MSELoss()
 	else:
 		raise RuntimeError("{}criterion not available!".format(optimizer))
 
-	if use_gpu:
-		network.cuda()
+	# model
+	model = get_model(network, optimizer=opt, criterion=loss, use_gpu=use_gpu)
 
-	n_batch = len(train_loader)
-	t0 = time.time()
 	if not load_network_state:
-		best_RMSE = 1e9
-		for i_epoch in range(n_epoch):
-			network.train()
-			with torch.enable_grad():
-				for j, (inputs, targets) in enumerate(train_loader):
-					if use_gpu:
-						inputs = inputs.cuda()
-						targets = targets.cuda()
-					opt.zero_grad()
-					output = network(inputs)
-					batch_loss = loss(output, targets)
-					batch_loss.backward()
-					opt.step()
-					j += 1
-				# sys.stdout.write("%s[%s%s] %i/%i\r" % ("mini batch :", "#"*j, "."*(n_batch-j), j, n_batch))
-				# sys.stdout.flush()
-			train_loss, train_RMSE = validate(network, train_loader, loss, use_gpu=use_gpu)
-			valid_loss, valid_RMSE = validate(network, valid_loader, loss, use_gpu=use_gpu)
-			t1 = time.time()
-			lr = opt.param_groups[0]['lr']
-			if i_epoch % 2 == 0 and i_epoch != 0 and lr > 1e-5:
-				scheduler.step()
-			history.save(dict(acc=train_RMSE, val_acc=valid_RMSE, loss=train_loss, val_loss=valid_loss, lr=lr))
-			print(f'Epoch {i_epoch} ({t1 - t0:.1f} s) - Train RMSE: {train_RMSE:.3e} - Val RMSE: {valid_RMSE:.3e} - Train loss: {train_loss:.3e} - Val loss: {valid_loss:.3e} - lr: {lr:.2e}')
-			# --------------------------------------------------------------------------------- #
-			#                            save best model parameters                             #
-			# --------------------------------------------------------------------------------- #
-			if valid_RMSE < best_RMSE:
-				torch.save(network.state_dict(), "{}_best.pt".format(save_path))
-				best_RMSE = valid_RMSE
+		model.fit_generator(
+			train_loader,
+			valid_loader,
+			epochs=n_epoch,
+			progress_options=dict(coloring=False),
+			callbacks=callbacks)
 		# --------------------------------------------------------------------------------- #
 		#                            save model at the end                                  #
 		# --------------------------------------------------------------------------------- #
-		torch.save(network, "{}_end.pt".format(save_path))
-		network = torch.load("{}_best.pt".format(save_path))
+		model.save_weights("{}_end.pt".format(save_path))
+		model.load_weights("{}_best.pt".format(save_path))
 		network.eval()
 		if use_gpu:
 			network.cuda()
 	else:
-		network = torch.load("{}_best.pt".format(save_path))
+		model.load_weights("{}_best.pt".format(save_path))
 		network.eval()
 		if use_gpu:
 			network.cuda()
@@ -156,7 +129,7 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	validate(network, valid_loader, loss, use_gpu=use_gpu, save_data=True)
 	#draw_all_preds_targets(network, valid_loader)
-	return history
+	return history_callback.history
 
 
 if __name__ == '__main__':
@@ -265,9 +238,10 @@ if __name__ == '__main__':
 		aapm_dataset_valid = BreastCTDataset(valid_images_contest, valid_images_contest, preprocessing=preprocessing)
 		leonardo_dataset = BreastCTDataset(train_images["FDK"][:100], train_images["VIRTUAL_BREAST"][:100], preprocessing=preprocessing)
 	else:
-		train_images, test_images = load_all_images(n_batch=1)
+		train_images, test_images = load_all_images(image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1)
 		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
 		leonardo_dataset = BreastCTDataset(train_images["FDK"], train_images["VIRTUAL_BREAST"], preprocessing=preprocessing)
+		aapm_dataset_valid = None
 
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
