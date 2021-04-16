@@ -31,14 +31,14 @@ def contest_metric_evaluation(INPUT, OUT):
 	prediction_phantoms = np.load(os.path.join(PREDICTION_OUTPUT,prediction_file_name))
 
 	# get the number of prediction_phantoms and number of pixels in x and y
-	nim, nx, ny = prediction_phantoms.shape 
+	nim, nx, ny = prediction_phantoms.shape
 
 	# mean RMSE computation
 	diffsquared = (phantom_gt-prediction_phantoms)**2
 	num_pix = float(nx*ny)
 
 	meanrmse  = np.sqrt( ((diffsquared/num_pix).sum(axis=2)).sum(axis=1) ).mean()
-	print("The mean RSME over %3i images is %8.6f "%(nim,meanrmse))
+	print("The mean RMSE over %3i images is %8.6f "%(nim,meanrmse))
 
 	# worst-case ROI RMSE computation
 	roisize = 25  #width and height of test ROI in pixels
@@ -109,3 +109,18 @@ def validate(network, valid_loader, criterion, use_gpu=True, save_data=False, ou
 		contest_metric_evaluation(output_path, output_path)
 	return torch.mean(loss), np.mean(RMSE)
 
+def validate_model(model, valid_loader, save_data=False, output_path="data/model_trained_results", pred_folder="res", target_folder="ref"):
+	results = model.evaluate_generator(
+		valid_loader,
+		return_pred=save_data,
+		return_ground_truth=save_data,
+		progress_options=dict(coloring=False))
+	if save_data:
+		if not os.path.isdir(os.path.join(output_path, pred_folder)):
+			os.makedirs(os.path.join(output_path, pred_folder))
+		if not os.path.isdir(os.path.join(output_path, target_folder)):
+			os.makedirs(os.path.join(output_path, target_folder))
+		np.save(os.path.join(output_path, pred_folder, "predictions"), np.squeeze(results[2]))
+		np.save(os.path.join(output_path, target_folder, "targets"), np.squeeze(results[3]))
+		contest_metric_evaluation(output_path, output_path)
+	return results[0]

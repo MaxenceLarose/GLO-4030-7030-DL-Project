@@ -24,7 +24,7 @@ from poutyne import ModelCheckpoint
 
 from utils.util import get_preprocessing
 from draw_images import draw_pred_target, draw_all_preds_targets
-from model.metrics import validate
+from model.metrics import validate_model
 from data_loader.data_loaders import load_all_images, load_images
 from data_loader.datasets import BreastCTDataset, train_valid_loaders
 from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
@@ -109,25 +109,19 @@ def train_network(
 		# --------------------------------------------------------------------------------- #
 		model.save_weights("{}_end.pt".format(save_path))
 		model.load_weights("{}_best.pt".format(save_path))
-		network.eval()
-		if use_gpu:
-			network.cuda()
 	else:
 		model.load_weights("{}_best.pt".format(save_path))
-		network.eval()
-		if use_gpu:
-			network.cuda()
 	# --------------------------------------------------------------------------------- #
 	#                            save challenge images                                  #
 	# --------------------------------------------------------------------------------- #
 	if dataset_test_challenge is not None:
 		test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
-		validate(network, test_loader, loss, use_gpu=use_gpu, save_data=True, output_path="data/challenge")
+		validate_model(model, test_loader, save_data=True, output_path="data/challenge")
 		#draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
 	# --------------------------------------------------------------------------------- #
 	#                            save validation images                                 #
 	# --------------------------------------------------------------------------------- #
-	validate(network, valid_loader, loss, use_gpu=use_gpu, save_data=True)
+	validate_model(model, valid_loader, save_data=True)
 	#draw_all_preds_targets(network, valid_loader)
 	return history_callback.history
 
