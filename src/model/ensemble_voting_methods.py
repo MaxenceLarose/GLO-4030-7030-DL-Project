@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 class WeightedAverage(object):
     def __init__(
             self,
-            loss_rmse: List[List, ..., List],
+            loss_rmse: List[List],
             input_shape: Tuple[int, int, int],
     ):
         super().__init__()
@@ -77,14 +77,23 @@ class CNNVote(nn.Module):
         return out
 
 
-class VotingEnsemble(object):
-    def __init__(self, method: str, loss_rmse: list, input_shape: tuple, output_shape: int, **kwargs):
+class EnsembleVoting(object):
+    def __init__(self, method: str, input_shape: Tuple[int, int, int], loss_rmse: List[List] = None, **kwargs):
         """
         Constructor of the class VotingEnsemble.
 
         Args:
             method (str): Method used to calculate the result of the vote. Implemented methods are 'WeightedAverage',
                           'FCLayers', 'CNN'.
+            input_shape (Tuple[int, int, int]): The input shape of the network. For example, if the size of the images
+                                                are 512x512 and there is 3 models in the ensemble, the input_shape must
+                                                be (3, 512, 512).
+            loss_rmse (List[List]): If the chosen method is 'WeightedAverage', the value of this variable needs to be
+                                    given. The loss_rmse should be given in the form of a list of loss lists. Each list
+                                    contains every RMSE loss value associated with the training images. All models used
+                                    in the ensemble must therefore be evaluated with the training images to obtain this
+                                    list. (Default = None)
+
         Return:
             None
         """
@@ -98,7 +107,7 @@ class VotingEnsemble(object):
 
         self.loss_rmse = loss_rmse
         self.input_shape = input_shape
-        self.output_shape = output_shape
+        self.output_shape = input_shape[1]*input_shape[2]
         self.kwargs = kwargs
         self.network = None
 
@@ -115,10 +124,14 @@ class VotingEnsemble(object):
                                       f"{self.available_methods}.")
 
         elif method == self.available_methods[0]:
-            self.network = WeightedAverage(
-                loss_rmse=self.loss_rmse,
-                input_shape=self.input_shape
-            )
+            if self.loss_rmse is None:
+                raise ValueError(f"If the chosen method is {self.available_methods[0]}, the value of this variable "
+                                 f"needs to be given.")
+            else:
+                self.network = WeightedAverage(
+                    loss_rmse=self.loss_rmse,
+                    input_shape=self.input_shape
+                )
 
         elif method == self.available_methods[1]:
             self.network = FCLayersVote(
@@ -135,19 +148,15 @@ class VotingEnsemble(object):
 
         self._method = method
 
-    def train_and_test_network(
+    def train_network(
             self,
             loaders: Dict[str, DataLoader],
+            save_path="model/ensemble_method_model/",
             **training_kwargs
-    ) -> Tuple[list, tuple]:
+    ):
         if self._method == self.available_methods[0]:
-            logging.info(f"The {self._method} doesn't require training.")
-            model = self.network
-
-            test_metrics = model.evaluate_generator(loaders["test"])
-
-            return None, test_metrics
-
+            logging.info(f"The {self._method} doesn't require training. Use the test_network function.")
+            return []
         else:
             params = [p for p in self.network.parameters() if p.requires_grad]
             if len(params) == 0:
@@ -159,7 +168,7 @@ class VotingEnsemble(object):
                 optimizer = torch.optim.Adam(
                     params,
                     lr=training_kwargs.get("lr", 1e-3),
-                    weight_decay=1e-3,
+                    weight_decay=training_kwargs.get("weight_decay", 1e-3),
                 )
                 model = pt.Model(self.network, optimizer, 'MSELoss', batch_metrics=['accuracy'])
                 if torch.cuda.is_available():
@@ -173,7 +182,25 @@ class VotingEnsemble(object):
                     epochs=training_kwargs.get("epochs", 5),
                     callbacks=[scheduler],
                 )
-                logging.info(f"history: \n{pprint.pformat(history, indent=4)}")
-                test_metrics = model.evaluate_generator(loaders["test"])
 
-                return history, test_metrics
+                model.save_weights(f"{save_path}/{self._method}.pt")
+
+                logging.info(f"history: \n{pprint.pformat(history, indent=4)}")
+
+                return history
+
+    def test_network(
+            self,
+            loaders: Dict[str, DataLoader],
+            save_path="model/ensemble_method_model/"
+    ) -> tuple:
+        if self._method == self.available_methods[0]:
+            model = self.network
+            test_metrics = model.evaluate_generator(loaders["test"])
+
+        else:
+            model = pt.Model(self.network, optimizer=None, loss_function=None, batch_metrics=["accuracy"])
+            model.load_weights(f"{save_path}/{self._method}.pt")
+            test_metrics = model.evaluate_generator(loaders["test"])
+
+        return test_metrics
