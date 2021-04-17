@@ -120,12 +120,12 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	if dataset_test_challenge is not None:
 		test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
-		#validate_model(model, test_loader, save_data=True, output_path="data/challenge")
+		validate_model(model, test_loader, save_data=True, output_path="data/challenge")
 		#draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
 	# --------------------------------------------------------------------------------- #
 	#                            save validation images                                 #
 	# --------------------------------------------------------------------------------- #
-	#validate_model(model, valid_loader, save_data=True)
+	validate_model(model, valid_loader, save_data=True)
 	#draw_all_preds_targets(network, valid_loader)
 	return history_callback.history
 
