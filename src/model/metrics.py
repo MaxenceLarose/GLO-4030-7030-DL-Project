@@ -74,7 +74,7 @@ def contest_metric_evaluation(INPUT, OUT):
 
 def validate(network, valid_loader, criterion, use_gpu=True, save_data=False,
 		output_path="data/model_trained_results", pred_folder="res", target_folder="ref"):
-	model = Model(network, loss_function=criterion, batch_metrics=['accuracy'])
+	model = Model(network, optimizer=None, loss_function=criterion, batch_metrics=['accuracy'])
 	if use_gpu:
 		if torch.cuda.is_available():
 			model.cuda()
