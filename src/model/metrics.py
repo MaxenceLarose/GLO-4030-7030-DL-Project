@@ -48,7 +48,7 @@ def contest_metric_evaluation(INPUT, OUT):
 
 	maxerr = -1.
 	for i in range(nim): # For each image
-	   print("Searching image %3i"%(i))
+	   print("Searching images: %3i/%3i"%(i+1,nim), end='\r')
 	   phantom = phantom_gt[i].copy() # GT
 	   prediction =  prediction_phantoms[i].copy() # Pred
 	   # These for loops cross every pixel in image (from region of interest)
@@ -73,7 +73,6 @@ def contest_metric_evaluation(INPUT, OUT):
 def validate(network, valid_loader, criterion, use_gpu=True, save_data=False, output_path="data/model_trained_results", pred_folder="res", target_folder="ref"):
 	loss = []
 	RMSE = []
-	worst_RMSE = []
 	store_preds = []
 	store_targets = []
 	network.eval()
@@ -90,7 +89,6 @@ def validate(network, valid_loader, criterion, use_gpu=True, save_data=False, ou
 			pred = pred.cpu().numpy()
 			for i in range(targets.shape[0]):
 				RMSE.append(np.sqrt((((targets[i][0] - pred[i][0])**2/(pred.shape[2] * pred.shape[3])).sum(axis=1)).sum(axis=0)).mean())
-				#RMSE.append(mean_squared_error(targets[i][0], pred[i][0], squared=False))
 			if save_data:
 				store_preds.append(pred.reshape(pred.shape[0], pred.shape[2], pred.shape[3]))
 				if targets is not None:
@@ -109,18 +107,22 @@ def validate(network, valid_loader, criterion, use_gpu=True, save_data=False, ou
 		contest_metric_evaluation(output_path, output_path)
 	return torch.mean(loss), np.mean(RMSE)
 
-def validate_model(model, valid_loader, save_data=False, output_path="data/model_trained_results", pred_folder="res", target_folder="ref"):
+def validate_model(model, valid_loader, save_data=False, output_path="data/model_trained_results",
+		pred_folder="res", target_folder="ref"):
 	results = model.evaluate_generator(
 		valid_loader,
 		return_pred=save_data,
 		return_ground_truth=save_data,
 		progress_options=dict(coloring=False))
 	if save_data:
+		loss = results[0]
 		if not os.path.isdir(os.path.join(output_path, pred_folder)):
 			os.makedirs(os.path.join(output_path, pred_folder))
 		if not os.path.isdir(os.path.join(output_path, target_folder)):
 			os.makedirs(os.path.join(output_path, target_folder))
-		np.save(os.path.join(output_path, pred_folder, "predictions"), np.squeeze(results[2]))
-		np.save(os.path.join(output_path, target_folder, "targets"), np.squeeze(results[3]))
+		np.save(os.path.join(output_path, pred_folder, "predictions"), np.squeeze(results[1]))
+		np.save(os.path.join(output_path, target_folder, "targets"), np.squeeze(results[2]))
 		contest_metric_evaluation(output_path, output_path)
-	return results[0]
+	else:
+		loss = results
+	return loss

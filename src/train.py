@@ -19,7 +19,6 @@ from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from deeplib.history import History
 from deeplib.training import HistoryCallback, get_model
-#from deeplib.datasets import train_valid_loaders
 from poutyne import ModelCheckpoint
 
 from utils.util import get_preprocessing
@@ -44,60 +43,64 @@ def train_network(
 		use_gpu=True,
 		criterion="MSELoss",
 		callbacks=None,
-		save_path="model/entire_model",
-		load_data_for_challenge=False,
-		dataset_test_challenge=None,
 		load_network_state=False,
+		save_path="model/entire_model",
+		dataset_test_challenge=None,
 		leonardo_dataset=None
 ):
 	"""
-	Entraîne un réseau de neurones PyTorch avec Poutyne. On suppose que la sortie du réseau est compatible avec
-	la fonction cross-entropy de PyTorch pour calculer l'exactitude (accuracy).
+	Entraîne un réseau de neurones PyTorch avec Poutyne. On suppose que la sortie du réseau est
+	compatible avec la fonction cross-entropy de PyTorch pour calculer l'exactitude (accuracy).
 
 	Args:
 		network (nn.Module): Un réseau de neurones PyTorch
-		optimizer (torch.optim.Optimizer): Un optimiseur PyTorch
 		dataset (torch.utils.data.Dataset): Un jeu de données PyTorch
+		optimizer (string): Le nom d'un optimiseur PyTorch
+		lr (float): Le learning rate pour l'entraînement
+		momentum (float): Le momentum pour l'entraînement (si SGD)
+		weight_decay (float): Le weight decay pour l'entraînement
 		n_epoch (int): Le nombre d'epochs d'entraînement désiré
 		batch_size (int): La taille de batch désirée
-		use_gpu (bool): Si on veut utiliser le GPU. Est vrai par défaut. Un avertissement est lancé s'il n'y a pas de
-			GPU.
-		criterion: Une fonction de perte compatible avec la cross-entropy de PyTorch.
-		callbacks (List[poutyne.Callback]): Une liste de callbacks de Poutyne (utile pour les horaires d'entrainement
-			entre autres).
+		use_gpu (bool): S'il faut utiliser le GPU (avertissement si pas de GPU)
+		criterion (string): Le nom d'une fonction de perte compatible avec la cross-entropy de PyTorch
+		callbacks (List[poutyne.Callback]): Une liste de callbacks de Poutyne
+		load_network_state (bool): S'il faut charger un fichier de poids plutôt qu'entraîner
+		save_path (string): Le répertoire où sauvegarder les poids du réseau
+		dataset_test_challenge (torch.utils.data.Dataset): Le jeu de données de test du concours
+		leonardo_dataset (torch.utils.data.Dataset): Le jeu de données pour l'augmentation
 
 	Returns:
 		Retourne un objet de type `deeplib.history.History` contenant l'historique d'entraînement.
 	"""
+	# --------------------------------------------------------------------------------- #
+	#                                 build model                                       #
+	# --------------------------------------------------------------------------------- #
 	history_callback = HistoryCallback()
 	checkpoint_callback = ModelCheckpoint("{}_best.pt".format(save_path), save_best_only=True)
-	callbacks = [history_callback, checkpoint_callback] if callbacks is None else [history_callback, checkpoint_callback] + callbacks
+	callbacks = [
+		history_callback, checkpoint_callback] if callbacks is None else [
+		history_callback, checkpoint_callback] + callbacks
 	if leonardo_dataset is not None:
-		train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size, valid_dataset=leonardo_dataset)
-
+		train_loader, valid_loader = train_valid_loaders(
+			dataset, batch_size=batch_size, valid_dataset=leonardo_dataset)
 	else:
-		train_loader, valid_loader = train_valid_loaders(dataset, batch_size=batch_size, train_split=0.9)
-
-	# optimizer
+		train_loader, valid_loader = train_valid_loaders(
+			dataset, batch_size=batch_size, train_split=0.9)
 	if optimizer == "Adam":
 		opt = optim.Adam(network.parameters(), lr=lr, weight_decay=weight_decay)
 	elif optimizer == "SGD":
 		opt = optim.SGD(network.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
 	else:
 		raise RuntimeError("{} optimizer not available!".format(optimizer))
-	#scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=3)
-	scheduler = optim.lr_scheduler.ExponentialLR(opt, 0.94)
-
-	# loss function
 	if criterion == "MSELoss":
 		loss = nn.MSELoss()
 	else:
-		raise RuntimeError("{}criterion not available!".format(optimizer))
-
-	# model
+		raise RuntimeError("{} criterion not available!".format(optimizer))
 	model = get_model(network, optimizer=opt, criterion=loss, use_gpu=use_gpu)
-
 	if not load_network_state:
+		# --------------------------------------------------------------------------------- #
+		#                                 train model                                       #
+		# --------------------------------------------------------------------------------- #
 		model.fit_generator(
 			train_loader,
 			valid_loader,
@@ -108,20 +111,21 @@ def train_network(
 		#                            save model at the end                                  #
 		# --------------------------------------------------------------------------------- #
 		model.save_weights("{}_end.pt".format(save_path))
-		model.load_weights("{}_best.pt".format(save_path))
-	else:
-		model.load_weights("{}_best.pt".format(save_path))
+	# --------------------------------------------------------------------------------- #
+	#                               load best model                                     #
+	# --------------------------------------------------------------------------------- #
+	model.load_weights("{}_best.pt".format(save_path))
 	# --------------------------------------------------------------------------------- #
 	#                            save challenge images                                  #
 	# --------------------------------------------------------------------------------- #
 	if dataset_test_challenge is not None:
 		test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
-		validate_model(model, test_loader, save_data=True, output_path="data/challenge")
+		#validate_model(model, test_loader, save_data=True, output_path="data/challenge")
 		#draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
 	# --------------------------------------------------------------------------------- #
 	#                            save validation images                                 #
 	# --------------------------------------------------------------------------------- #
-	validate_model(model, valid_loader, save_data=True)
+	#validate_model(model, valid_loader, save_data=True)
 	#draw_all_preds_targets(network, valid_loader)
 	return history_callback.history
 
@@ -146,7 +150,6 @@ if __name__ == '__main__':
 	weight_decay = 1e-4
 	criterion = "MSELoss"
 	optimizer = "Adam"
-
 	# unet setup constants
 	nb_filter=(64, 128, 256, 512, 1024)
 	use_relu=False
@@ -156,8 +159,7 @@ if __name__ == '__main__':
 		batch_norm_momentum = 0.01
 	else:
 		batch_norm_momentum = 0.05
-
-	#seed
+	# seed
 	seed = 42
 	set_seed(seed)
 
@@ -171,12 +173,11 @@ if __name__ == '__main__':
 		"Pretrained Simple UNet",
 		"Pretrained RED_CNN"
 	]
-
 	network_to_use: str = "UNet"
-
 	if network_to_use not in available_networks:
-		raise NotImplementedError(f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
-	elif network_to_use is "UNet":
+		raise NotImplementedError(
+			f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
+	elif network_to_use == "UNet":
 		model = UNet(1, 1,
 					channels_depth_number=nb_filter,
 					use_relu=use_relu,  # If False, then LeakyReLU
@@ -184,21 +185,21 @@ if __name__ == '__main__':
 					residual_block=residual_block,  # skip connections?
 					batch_norm_momentum=batch_norm_momentum)
 		preprocessing = None
-	elif network_to_use is "NestedUNet":
+	elif network_to_use == "NestedUNet":
 		model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
 		preprocessing = None
-	elif network_to_use is "SMP UnetPLusPLus":
+	elif network_to_use == "SMP UnetPLusPLus":
 		encoder = "densenet121"
 		encoder_weights = "imagenet"
 		activation = "logits"
 		encoder_depth = 5
 		decoder_channels = (1024, 512, 256, 128, 64)
-		preprocessing = get_preprocessing(get_preprocessing_fn(encoder_name=encoder, pretrained=encoder_weights))
+		preprocessing = get_preprocessing(get_preprocessing_fn(
+			encoder_name=encoder, pretrained=encoder_weights))
 		if preprocessing:
 			in_channels = 3
 		else:
 			in_channels = 1
-
 		model = UNetPlusPLus(
 			unfreezed_layers=["encoder", "decoder"],
 			in_channels=in_channels,
@@ -208,33 +209,39 @@ if __name__ == '__main__':
 			encoder_weights=encoder_weights,
 			activation=activation
 		)
-	elif network_to_use is "Pretrained Simple UNet":
+	elif network_to_use == "Pretrained Simple UNet":
 		model = PretrainedUNet(
 			1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
 		)
 		preprocessing = None
-	elif network_to_use is "Pretrained RED_CNN":
+	elif network_to_use == "Pretrained RED_CNN":
 		model = PretrainedREDCNN(unfreezed_layers=["conv", "tconv"])
 		preprocessing = None
 	else:
 		warnings.warn("Something very wrong happened")
-
 	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in model.parameters()])}")
 
 	# --------------------------------------------------------------------------------- #
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
 	if load_data_for_challenge:
-		train_images, test_images = load_all_images(image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1,
+		train_images, test_images = load_all_images(
+			image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1,
 			multiple_channels=False, load_sinograms=False, merge_datasets=False)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
-		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
-		aapm_dataset_valid = BreastCTDataset(valid_images_contest, valid_images_contest, preprocessing=preprocessing)
-		leonardo_dataset = BreastCTDataset(train_images["FDK"][:100], train_images["VIRTUAL_BREAST"][:100], preprocessing=preprocessing)
+		aapm_dataset = BreastCTDataset(
+			train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+		aapm_dataset_valid = BreastCTDataset(
+			valid_images_contest, valid_images_contest, preprocessing=preprocessing)
+		leonardo_dataset = BreastCTDataset(
+			train_images["FDK"][:100], train_images["VIRTUAL_BREAST"][:100], preprocessing=preprocessing)
 	else:
-		train_images, test_images = load_all_images(image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1)
-		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
-		leonardo_dataset = BreastCTDataset(train_images["FDK"], train_images["VIRTUAL_BREAST"], preprocessing=preprocessing)
+		train_images, test_images = load_all_images(
+			image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1)
+		aapm_dataset = BreastCTDataset(
+			train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+		leonardo_dataset = BreastCTDataset(
+			train_images["FDK"], train_images["VIRTUAL_BREAST"], preprocessing=preprocessing)
 		aapm_dataset_valid = None
 
 	# --------------------------------------------------------------------------------- #
@@ -251,9 +258,9 @@ if __name__ == '__main__':
 		batch_size=batch_size,
 		criterion=criterion,
 		use_gpu=True,
-		dataset_test_challenge=aapm_dataset_valid,
 		load_network_state=load_network_state,
 		save_path="model/model_state",
+		dataset_test_challenge=aapm_dataset_valid,
 		leonardo_dataset=leonardo_dataset
 	)
 

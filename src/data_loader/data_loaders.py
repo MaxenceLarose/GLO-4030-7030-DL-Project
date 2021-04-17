@@ -11,7 +11,7 @@ import gzip
 
 def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 	"""
-	Read all the images (of certain type) located in the folder path. 
+	Read all the images (of certain type) located in the folder path.
 	The dtype are already encoded in float32.
 
 	args:
@@ -19,7 +19,7 @@ def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 		path (str): the path to the data files
 		n_batch (int): The number of files to load (max value is 4)
 
-	return:	
+	return:
 		The image dataset (ndarray)
 	"""
 	files = glob.glob(os.path.join(path, "{}*.npy*".format(image_type)))
@@ -39,16 +39,16 @@ def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 	return data
 
 
-def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"], 
-	path : str="data", 
-	n_batch : int=4, 
-	train_split : float=0.9,  
-	clip : bool=False, 
+def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
+	path : str="data",
+	n_batch : int=4,
+	train_split : float=0.9,
+	clip : bool=False,
 	load_sinograms=False,
 	multiple_channels=False,
 	merge_datasets=False) -> tuple:
 	"""
-	Read all the images located in the folder path. 
+	Read all the images located in the folder path.
 	The dtype are already encoded in float32.
 
 	args:
@@ -56,12 +56,12 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 		n_batch (int): number of files to load
 		train_split (float): fraction of data that will be used for training (train set and validation set)
 
-	return:	
+	return:
 		The image dataset (dict)
 	"""
 	train_images = {}
 	test_images = {}
-	
+
 	for image_type in image_types:
 		if not load_sinograms and image_type == "Sinogram":
 			continue
@@ -94,6 +94,5 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 		except KeyError:
 			train_images["FBP"] = train_images["FDK"]
 			test_images["FBP"] = test_images["FDK"]
-	print(train_images["FBP"].shape)
 
 	return train_images, test_images
