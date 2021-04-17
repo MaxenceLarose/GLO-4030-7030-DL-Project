@@ -50,21 +50,21 @@ def contest_metric_evaluation(INPUT, OUT):
 
 	maxerr = -1.
 	for i in range(nim): # For each image
-	   print("Searching images: %3i/%3i"%(i+1,nim), end='\r')
-	   phantom = phantom_gt[i].copy() # GT
-	   prediction =  prediction_phantoms[i].copy() # Pred
-	   # These for loops cross every pixel in image (from region of interest)
-	   for ix in range(nx-roisize):
-		  for iy in range(ny-roisize):
-			 roiGT =  phantom[ix:ix+roisize,iy:iy+roisize].copy() # GT
-			 roiPred =  prediction[ix:ix+roisize,iy:iy+roisize].copy() # Pred
-			 if roiGT.max()>0.01: #Don't search ROIs in regions where the truth image is zero
-				roirmse = np.sqrt( (((roiGT-roiPred)**2)/float(roisize**2)).sum() )
-				if roirmse>maxerr:
-				   maxerr = roirmse
-				   x0 = ix
-				   y0 = iy
-				   im0 = i
+		print("Searching images: %3i/%3i"%(i+1,nim), end='\r')
+		phantom = phantom_gt[i].copy() # GT
+		prediction =  prediction_phantoms[i].copy() # Pred
+		# These for loops cross every pixel in image (from region of interest)
+		for ix in range(nx-roisize):
+			for iy in range(ny-roisize):
+				roiGT =  phantom[ix:ix+roisize,iy:iy+roisize].copy() # GT
+				roiPred =  prediction[ix:ix+roisize,iy:iy+roisize].copy() # Pred
+				if roiGT.max()>0.01: #Don't search ROIs in regions where the truth image is zero
+					roirmse = np.sqrt( (((roiGT-roiPred)**2)/float(roisize**2)).sum() )
+					if roirmse>maxerr:
+						maxerr = roirmse
+						x0 = ix
+						y0 = iy
+						im0 = i
 	print("Worst-case ROI RMSE is %8.6f"%(maxerr))
 	print("Worst-case ROI location is (%3i,%3i) in image number %3i "%(x0,y0,im0+1))
 
