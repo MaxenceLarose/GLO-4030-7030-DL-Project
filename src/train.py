@@ -44,7 +44,7 @@ def train_network(
 		criterion="MSELoss",
 		callbacks=None,
 		load_network_state=False,
-		save_path="model/entire_model",
+		save_path="model/model_weights",
 		dataset_test_challenge=None,
 		leonardo_dataset=None
 ):
@@ -141,7 +141,7 @@ if __name__ == '__main__':
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
 	# training setup constants
-	load_data_for_challenge = True
+	load_data_for_challenge = False#True
 	load_network_state = False
 	lr = 0.0002
 	momentum = 0.9
@@ -243,6 +243,7 @@ if __name__ == '__main__':
 		leonardo_dataset = BreastCTDataset(
 			train_images["FDK"], train_images["VIRTUAL_BREAST"], preprocessing=preprocessing)
 		aapm_dataset_valid = None
+		n_epoch = 1
 
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
@@ -259,7 +260,7 @@ if __name__ == '__main__':
 		criterion=criterion,
 		use_gpu=True,
 		load_network_state=load_network_state,
-		save_path="model/model_state",
+		save_path="model/{}_weights".format(network_to_use),
 		dataset_test_challenge=aapm_dataset_valid,
 		leonardo_dataset=leonardo_dataset
 	)
@@ -267,4 +268,5 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	#                           network analysing                                       #
 	# --------------------------------------------------------------------------------- #
-	history.display()
+	if not load_network_state:
+		history.display()
