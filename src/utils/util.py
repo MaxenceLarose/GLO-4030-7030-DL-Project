@@ -74,3 +74,25 @@ def save_diff_dataset(path : str="data", n_batch=4):
         file = "./{}/DIFF_batch{}.npy".format(path, batch)
         np.save(file, phantom - fbp)
         logging.info(f"Pĥantom and FBP difference for batch {batch} saved to file {file}")
+
+    for batch in range(1, n_batch + 1):
+        file = glob.glob(os.path.join(path, "virtual_breast_{}.npy*".format(batch)))[0]
+        logging.info(f"Loading file {file}")
+        try:
+            f = gzip.GzipFile(file, "r")
+            phantom = np.load(f)
+            f.close()
+        except:
+            phantom = np.load(file)
+        file = glob.glob(os.path.join(path, "fdk_batch{}.npy*".format(batch)))[0]
+        logging.info(f"Loading file {file}")
+        try:
+            f = gzip.GzipFile(file, "r")
+            fbp = np.load(f)
+            f.close()
+        except:
+            fbp = np.load(file)
+        file = "./{}/DATA_LEO_DIFF_batch{}.npy".format(path, batch)
+        np.save(file, phantom - fbp)
+        logging.info(f"Pĥantom and FBP difference for batch {batch} saved to file {file}")
+
