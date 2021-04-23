@@ -26,7 +26,7 @@ def get_model(network, optimizer=None, criterion=None, use_gpu=True):
     if criterion is None:
         criterion = nn.CrossEntropyLoss()
 
-    model = pt.Model(network, optimizer, criterion, batch_metrics=['accuracy'])
+    model = pt.Model(network, optimizer, criterion)
     if use_gpu:
         if torch.cuda.is_available():
             model.cuda()
@@ -112,6 +112,7 @@ class HistoryCallback(pt.Callback):
 
     def on_epoch_end(self, epoch_number, logs):
         self.history.save(dict(**logs, lr=self.model.optimizer.param_groups[0]['lr']))
+        print("lr=", self.model.optimizer.param_groups[0]['lr'])
 
 
 def train(network, optimizer, dataset, n_epoch, batch_size, *, use_gpu=True, criterion=None, callbacks=None):
