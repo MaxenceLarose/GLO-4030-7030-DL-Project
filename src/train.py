@@ -19,7 +19,7 @@ from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from deeplib.history import History
 from deeplib.training import HistoryCallback, get_model
-from poutyne import ModelCheckpoint
+from poutyne import ModelCheckpoint, ReduceLROnPlateau
 
 from utils.util import get_preprocessing
 from draw_images import draw_pred_target, draw_all_preds_targets
@@ -77,9 +77,10 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	history_callback = HistoryCallback()
 	checkpoint_callback = ModelCheckpoint("{}_best.pt".format(save_path), save_best_only=True)
+	scheduler = ReduceLROnPlateau(patience=3, factor=0.1)
 	callbacks = [
-		history_callback, checkpoint_callback] if callbacks is None else [
-		history_callback, checkpoint_callback] + callbacks
+		history_callback, checkpoint_callback, scheduler] if callbacks is None else [
+		history_callback, checkpoint_callback, scheduler] + callbacks
 	if leonardo_dataset is not None:
 		train_loader, valid_loader = train_valid_loaders(
 			dataset, batch_size=batch_size, valid_dataset=leonardo_dataset)
@@ -145,15 +146,14 @@ if __name__ == '__main__':
 	# training setup constants
 	load_data_for_challenge = True
 	load_network_state = False
-	lr = 0.0002
+	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 100
+	n_epoch = 2
 	batch_size = 1
 	weight_decay = 1e-4
 	criterion = "RMSELoss"
 	optimizer = "Adam"
 	# unet setup constants
-	nb_filter=(64, 128, 256, 512, 1024)
 	use_relu=False
 	mode='nearest'
 	residual_block=True
@@ -180,6 +180,7 @@ if __name__ == '__main__':
 		raise NotImplementedError(
 			f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
 	elif network_to_use == "UNet":
+		nb_filter=(64, 128, 256, 512, 1024)
 		model = UNet(1, 1,
 					channels_depth_number=nb_filter,
 					use_relu=use_relu,  # If False, then LeakyReLU
@@ -188,6 +189,7 @@ if __name__ == '__main__':
 					batch_norm_momentum=batch_norm_momentum)
 		preprocessing = None
 	elif network_to_use == "NestedUNet":
+		nb_filter=(64, 128, 256, 512, 1024)
 		model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
 		preprocessing = None
 	elif network_to_use == "SMP UnetPLusPLus":
@@ -228,15 +230,16 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	if load_data_for_challenge:
 		train_images, test_images = load_all_images(
-			image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1,
+			image_types=["FBP", "Phantom", "Sinogram"], n_batch=1,
 			multiple_channels=False, load_sinograms=False, merge_datasets=False)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
 		aapm_dataset = BreastCTDataset(
-			train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+			train_images["FBP"][:100], train_images["PHANTOM"][:100], preprocessing=preprocessing)
 		aapm_dataset_valid = BreastCTDataset(
 			valid_images_contest, valid_images_contest, preprocessing=preprocessing)
-		leonardo_dataset = BreastCTDataset(
-			train_images["FDK"][:100], train_images["VIRTUAL_BREAST"][:100], preprocessing=preprocessing)
+		leonardo_dataset = None
+		# leonardo_dataset = BreastCTDataset(
+		# 	train_images["FDK"][:100], train_images["VIRTUAL_BREAST"][:100], preprocessing=preprocessing)
 	else:
 		train_images, test_images = load_all_images(
 			image_types=["FBP", "Phantom", "Sinogram", "virtual_breast", "fdk"], n_batch=1)
