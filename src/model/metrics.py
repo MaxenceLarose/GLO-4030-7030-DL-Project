@@ -5,6 +5,18 @@ import os
 import pdb
 
 from poutyne import Model
+import torch.nn as nn
+
+
+# Classe de fonction de perte RMSE pour modele poutyne
+class RMSELoss(nn.Module):
+    def __init__(self, epsilon=1e-10):
+        super().__init__()
+        self.MSE = nn.MSELoss()
+        self.epsilon = epsilon
+    def forward(self, pred, target):
+        loss = torch.sqrt(self.MSE(pred, target) + self.epsilon)
+        return loss
 
 def contest_metric_evaluation(INPUT, OUT):
 	# INPUT which has both ./ref and ./res - user submission

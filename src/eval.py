@@ -6,7 +6,7 @@ import torch
 
 from data_loader.data_loaders import load_all_images
 from data_loader.datasets import BreastCTDataset
-from model.metrics import validate
+from model.metrics import validate, RMSELoss
 
 def eval_model(model_file, batch_size=1, use_gpu=True):
 	# --------------------------------------------------------------------------------- #
@@ -27,7 +27,7 @@ def eval_model(model_file, batch_size=1, use_gpu=True):
 	# --------------------------------------------------------------------------------- #
 	#                            eval                                                   #
 	# --------------------------------------------------------------------------------- #
-	loss = nn.MSELoss()
+	loss = RMSELoss
 	validate(model, valid_loader, loss, use_gpu=use_gpu, save_data=False)
 
 

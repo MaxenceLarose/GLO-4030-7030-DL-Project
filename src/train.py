@@ -23,7 +23,7 @@ from poutyne import ModelCheckpoint
 
 from utils.util import get_preprocessing
 from draw_images import draw_pred_target, draw_all_preds_targets
-from model.metrics import validate_model
+from model.metrics import validate_model, RMSELoss
 from data_loader.data_loaders import load_all_images, load_images
 from data_loader.datasets import BreastCTDataset, train_valid_loaders
 from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
@@ -94,6 +94,8 @@ def train_network(
 		raise RuntimeError("{} optimizer not available!".format(optimizer))
 	if criterion == "MSELoss":
 		loss = nn.MSELoss()
+	elif criterion == "RMSELoss":
+		loss = RMSELoss()
 	else:
 		raise RuntimeError("{} criterion not available!".format(optimizer))
 	model = get_model(network, optimizer=opt, criterion=loss, use_gpu=use_gpu)
@@ -141,14 +143,14 @@ if __name__ == '__main__':
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
 	# training setup constants
-	load_data_for_challenge = False#True
+	load_data_for_challenge = True
 	load_network_state = False
 	lr = 0.0002
 	momentum = 0.9
 	n_epoch = 100
 	batch_size = 1
 	weight_decay = 1e-4
-	criterion = "MSELoss"
+	criterion = "RMSELoss"
 	optimizer = "Adam"
 	# unet setup constants
 	nb_filter=(64, 128, 256, 512, 1024)
@@ -243,7 +245,6 @@ if __name__ == '__main__':
 		leonardo_dataset = BreastCTDataset(
 			train_images["FDK"], train_images["VIRTUAL_BREAST"], preprocessing=preprocessing)
 		aapm_dataset_valid = None
-		n_epoch = 1
 
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
