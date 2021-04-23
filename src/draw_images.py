@@ -18,6 +18,8 @@ import torch
 from sklearn.metrics import mean_squared_error
 from skimage.metrics import structural_similarity
 
+from utils.util import get_phantom_from_diff
+
 
 def draw_images(images : dict, image_idx=0):
 	fig, ax = plt.subplots(1, 3)
@@ -103,7 +105,7 @@ def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=o
 	plt.close(fig)
 	return mssim, rmse
 
-def draw_all_preds_targets(network, valid_loader, output_path=os.path.relpath("../Figures"), use_gpu=True):
+def draw_all_preds_targets(network, valid_loader, output_path=os.path.relpath("../Figures"), use_gpu=True, train_with_diff=False):
 	image_idx = 0
 	valid_mssim = []
 	valid_rmse = []
@@ -116,6 +118,8 @@ def draw_all_preds_targets(network, valid_loader, output_path=os.path.relpath(".
 			pred = pred.cpu().numpy()
 			inputs = inputs.cpu().numpy()
 			targets = targets.cpu().numpy()
+			# if train_with_diff:
+			# 	pred = get_phantom_from_diff(inputs, pred)
 			for j in range(inputs.shape[0]):
 				mssim, rmse = draw_pred_target(inputs, targets, pred, image_idx=image_idx, fig_id=i*inputs.shape[0]+j, output_path=output_path)
 				valid_mssim.append(mssim)
