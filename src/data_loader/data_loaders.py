@@ -61,7 +61,8 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 	"""
 	train_images = {}
 	test_images = {}
-
+	
+	#np.random.seed(42)
 	for image_type in image_types:
 		if not load_sinograms and image_type == "Sinogram":
 			continue
@@ -71,6 +72,7 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 		n_examples = tmp_images.shape[0]
 		train_images[image_type.upper()] = tmp_images[:int(train_split * n_examples)]
 		test_images[image_type.upper()] = tmp_images[int(train_split * n_examples):]
+
 	if multiple_channels and "RECLEO" in train_images.keys():
 		train_images["FBP"] = np.concatenate((train_images["FBP"], train_images["RECLEO"]), axis=1)
 		test_images["FBP"] = np.concatenate((test_images["FBP"], test_images["RECLEO"]), axis=1)
@@ -95,4 +97,30 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 			train_images["FBP"] = train_images["FDK"]
 			test_images["FBP"] = test_images["FDK"]
 
+	if "DATA_LEO_DIFF" in train_images.keys():
+		try:
+			if merge_datasets:
+				train_images["DIFF"] = np.concatenate((train_images["DIFF"], train_images["DATA_LEO_DIFF"]), axis=0)
+				test_images["DIFF"] = np.concatenate((test_images["DIFF"], test_images["DATA_LEO_DIFF"]), axis=0)
+
+		except KeyError:
+			train_images["DIFF"] = train_images["DATA_LEO_DIFF"]
+			test_images["DIFF"] = test_images["DATA_LEO_DIFF"]
+	print(train_images.keys())
+	# shuffle
+	print(len(train_images["FBP"]))
+	idx_images_train = list(range(len(train_images["FBP"])))
+	np.random.shuffle(idx_images_train)
+	idx_images_test = list(range(len(test_images["FBP"])))
+	np.random.shuffle(idx_images_test)
+	if "DIFF" in train_images.keys():
+		train_images["DIFF"] = train_images["DIFF"][idx_images_train]
+		test_images["DIFF"] = test_images["DIFF"][idx_images_test]
+
+	train_images["FBP"] = train_images["FBP"][idx_images_train]
+	train_images["PHANTOM"] = train_images["PHANTOM"][idx_images_train]
+
+	test_images["FBP"] = test_images["FBP"][idx_images_test]
+	test_images["PHANTOM"] = test_images["PHANTOM"][idx_images_test]
+	#print(idx_images_train)
 	return train_images, test_images
