@@ -24,102 +24,133 @@ class VGGBlock(nn.Module):
 class InceptionBlock(nn.Module):
 	def __init__(self, in_channels, out_channels, middle_channels=None, reduce_channels=True, kernel_size_1=3, kernel_size_2=5, batch_norm_momentum=0.1):
 		super().__init__()
-		self.relu = nn.LeakyReLU(inplace=True)
-		self.reduce_channels = reduce_channels
+		if kernel_size_1 == kernel_size_2:
+			self.same_kernels = True
+		else:
+			self.same_kernels = False
 
-		if self.reduce_channels:
-			self.conv1x1_reduce = nn.Conv2d(2*out_channels, out_channels, kernel_size=1)
+		self.relu = nn.LeakyReLU(inplace=True)
+
 		if middle_channels is None:
 			middle_channels	= out_channels
-		# 3x3 convolutions
-		self.conv3x3_1 = nn.Conv2d(in_channels, middle_channels, kernel_size=3, padding=1)
-		self.conv3x3_2 = nn.Conv2d(middle_channels, out_channels, kernel_size=3, padding=1)
-		self.skip_3x3 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
 
-		# 5x5 convolutions
-		self.conv5x5_1 = nn.Conv2d(in_channels, middle_channels, kernel_size=5, padding=2)
-		self.conv5x5_2 = nn.Conv2d(middle_channels, out_channels, kernel_size=5, padding=2)
-		self.skip_5x5 = nn.Conv2d(in_channels, out_channels, kernel_size=5, padding=2)
-		# 7x7 convolutions
-		# self.conv7x7_1 = nn.Conv2d(in_channels, middle_channels, kernel_size=7, padding=3)
-		# self.conv7x7_2 = nn.Conv2d(middle_channels, out_channels, kernel_size=7, padding=3)
+		if kernel_size_1 == 3:
+			padding_1 = 1
+		elif kernel_size_1 == 5:
+			padding_1 = 2
+		elif kernel_size_1 == 7:
+			padding_1 = 3
+		elif kernel_size_1 == 1:
+			padding_1 = 0
 
-		self.bn_3x3_1 = nn.BatchNorm2d(middle_channels, momentum=batch_norm_momentum)
-		self.bn_3x3_2 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
-		self.bn_5x5_1 = nn.BatchNorm2d(middle_channels, momentum=batch_norm_momentum)
-		self.bn_5x5_2 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
-		# self.bn_7x7_1 = nn.BatchNorm2d(middle_channels, momentum=batch_norm_momentum)
-		# self.bn_7x7_2 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
-		self.bn_1x1 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
+		if kernel_size_2 == 3:
+			padding_2 = 1
+		elif kernel_size_2 == 5:
+			padding_2 = 2
+		elif kernel_size_2 == 7:
+			padding_2 = 3
+		elif kernel_size_2 == 1:
+			padding_2 = 0
+
+		# nxn convolutions 1
+		if self.same_kernels:
+			factor = 2
+		else:
+			factor = 1
+		self.conv_nxn_11 = nn.Conv2d(in_channels, middle_channels*factor, kernel_size=kernel_size_1, padding=padding_1)
+		self.conv_nxn_12 = nn.Conv2d(middle_channels*factor, out_channels*factor, kernel_size=kernel_size_1, padding=padding_1)
+		self.skip_nxn_1 = nn.Conv2d(in_channels, out_channels*factor, kernel_size=kernel_size_1, padding=padding_1)
+
+		if not self.same_kernels:
+			# nxn convolutions 2
+			self.conv_nxn_21 = nn.Conv2d(in_channels, middle_channels, kernel_size=kernel_size_2, padding=padding_2)
+			self.conv_nxn_22 = nn.Conv2d(middle_channels, out_channels, kernel_size=kernel_size_2, padding=padding_2)
+			self.skip_nxn_2 = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size_2, padding=padding_2)
+
+		self.bn_nxn_11 = nn.BatchNorm2d(middle_channels*factor, momentum=batch_norm_momentum)
+		self.bn_nxn_12 = nn.BatchNorm2d(out_channels*factor, momentum=batch_norm_momentum)
+
+		if not self.same_kernels:
+			self.bn_nxn_21 = nn.BatchNorm2d(middle_channels, momentum=batch_norm_momentum)
+			self.bn_nxn_22 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
+
+	def forward_1(self, x):
+		res_1 = x.clone()
+		res_2 = x.clone()
+		#conv nxn 1
+		out_1 = self.conv_nxn_11(x)
+		out_1 = self.bn_nxn_11(out_1)
+		out_1 = self.relu(out_1)
+		out_1 = self.conv_nxn_12(out_1)
+		out_1 = self.bn_nxn_12(out_1)
+		
+		if res_1.size() == out_1.size():
+			out_1 += res_1
+		else:
+			out_1 += self.skip_nxn_1(x)
+		out_1 = self.relu(out_1) 
+
+		#conv nxn 2
+		out_2 = self.conv_nxn_21(x)
+		out_2 = self.bn_nxn_21(out_2)
+		out_2 = self.relu(out_2)
+		out_2 = self.conv_nxn_22(out_2)
+		out_2 = self.bn_nxn_22(out_2)
+		
+		# concatenate result
+		if res_2.size() == out_2.size():
+			out_2 += res_2
+		else:
+			out_2 += self.skip_nxn_2(x)
+		out_2 = self.relu(out_2) 
+
+		out = torch.cat([out_1, out_2], 1)
+		return out
+
+	def forward_2(self, x):
+		out_1 = self.conv_nxn_11(x)
+		out_1 = self.bn_nxn_11(out_1)
+		out_1 = self.relu(out_1)
+		out_1 = self.conv_nxn_12(out_1)
+		out_1 = self.bn_nxn_12(out_1)
+		out_1 += self.skip_nxn_1(x)
+		out_1 = self.relu(out_1)
+		return out_1 
 
 	def forward(self, x):
-
-		#if reduce_channels is not None:
-		#	x = self.conv1x1_reduce(x)
-		#print(x)
-		#tmp = x.clone()
-		#res_3x3 = x[:, :x.size()[1]//2, :, :].clone()
-		#res_5x5 = x[:, x.size()[1]//2:, :, :].clone()
-		res_3x3 = x.clone()
-		res_5x5 = x.clone()
-		out3x3 = self.conv3x3_1(x)
-		out3x3 = self.bn_3x3_1(out3x3)
-		out3x3 = self.relu(out3x3)
-		out3x3 = self.conv3x3_2(out3x3)
-		out3x3 = self.bn_3x3_2(out3x3)
-		# out3x3 = self.relu(out3x3 + skip_3x3)
-		#print(res_3x3.size())
-		#print(out3x3.size())
-		#print()
-		if res_3x3.size() == out3x3.size():
-			out3x3 += res_3x3
+		if self.same_kernels:
+			return self.forward_2(x)
 		else:
-			out3x3 += self.skip_3x3(x)
-		out3x3 = self.relu(out3x3) 
-
-		#print(x)
-		#exit(0)
-		out5x5 = self.conv5x5_1(x)
-		out5x5 = self.bn_5x5_1(out5x5)
-		out5x5 = self.relu(out5x5)
-		out5x5 = self.conv5x5_2(out5x5)
-		out5x5 = self.bn_5x5_2(out5x5)
-		# out5x5 = self.relu(out5x5 + skip_5x5)
-		#out5x5 = self.relu(out5x5)
-		if res_5x5.size() == out5x5.size():
-			out5x5 += res_5x5
-		else:
-			out5x5 += self.skip_5x5(x)
-		out5x5 = self.relu(out5x5) 
-
-
-		out = torch.cat([out3x3, out5x5], 1)
-		#print(out.size())
-		# if self.reduce_channels:
-		# 	out = self.conv1x1_reduce(out)
-			# out = self.bn_1x1(out)
-			# out = self.relu(out)
-
-		return out
+			return self.forward_1(x)
 
 
 class InceptionUNet(nn.Module):
-    def __init__(self, num_classes, input_channels=3, nb_filter=[32, 64, 128, 256, 512], batch_norm_momentum=0.1):
+    def __init__(self, num_classes, input_channels=3, nb_filter=[32, 64, 128, 256, 512], batch_norm_momentum=0.1, kernel_size_1=[7,5,3,3,3], kernel_size_2=[5,3,3,3,1]):
         super().__init__()
 
         self.pool = nn.MaxPool2d(2, 2)
         self.up = nn.Upsample(scale_factor=2, mode='nearest')
-
-        self.conv0_0 = InceptionBlock(input_channels, nb_filter[0]//2, nb_filter[0]//2, batch_norm_momentum=0.1)
-        self.conv1_0 = InceptionBlock(nb_filter[0], nb_filter[1]//2, nb_filter[1]//2, batch_norm_momentum=0.1)
-        self.conv2_0 = InceptionBlock(nb_filter[1], nb_filter[2]//2, nb_filter[2]//2, batch_norm_momentum=0.1)
-        self.conv3_0 = InceptionBlock(nb_filter[2], nb_filter[3]//2, nb_filter[3]//2, batch_norm_momentum=0.1)
-        self.conv4_0 = InceptionBlock(nb_filter[3], nb_filter[4]//2, nb_filter[4]//2, batch_norm_momentum=0.1)
-
-        self.conv3_1 = InceptionBlock(nb_filter[3]+nb_filter[4], nb_filter[3]//2, nb_filter[3]//2, batch_norm_momentum=0.1)
-        self.conv2_2 = InceptionBlock(nb_filter[2]+nb_filter[3], nb_filter[2]//2, nb_filter[2]//2, batch_norm_momentum=0.1)
-        self.conv1_3 = InceptionBlock(nb_filter[1]+nb_filter[2], nb_filter[1]//2, nb_filter[1]//2, batch_norm_momentum=0.1)
-        self.conv0_4 = InceptionBlock(nb_filter[0]+nb_filter[1], nb_filter[0]//2, nb_filter[0]//2, batch_norm_momentum=0.1)
+        # Encoder
+        self.conv0_0 = InceptionBlock(input_channels, nb_filter[0]//2, nb_filter[0]//2, 
+        	kernel_size_1=kernel_size_1[0], kernel_size_2=kernel_size_2[0], batch_norm_momentum=0.1)
+        self.conv1_0 = InceptionBlock(nb_filter[0], nb_filter[1]//2, nb_filter[1]//2, 
+        	kernel_size_1=kernel_size_1[1], kernel_size_2=kernel_size_2[1], batch_norm_momentum=0.1)
+        self.conv2_0 = InceptionBlock(nb_filter[1], nb_filter[2]//2, nb_filter[2]//2, 
+        	kernel_size_1=kernel_size_1[2], kernel_size_2=kernel_size_2[2], batch_norm_momentum=0.1)
+        self.conv3_0 = InceptionBlock(nb_filter[2], nb_filter[3]//2, nb_filter[3]//2, 
+        	kernel_size_1=kernel_size_1[3], kernel_size_2=kernel_size_2[3], batch_norm_momentum=0.1)
+        # bridge
+        self.conv4_0 = InceptionBlock(nb_filter[3], nb_filter[4]//2, nb_filter[4]//2, 
+        	kernel_size_1=kernel_size_1[4], kernel_size_2=kernel_size_2[4], batch_norm_momentum=0.1)
+        # decoder
+        self.conv3_1 = InceptionBlock(nb_filter[3]+nb_filter[4], nb_filter[3]//2, nb_filter[3]//2, 
+        	kernel_size_1=3, kernel_size_2=3, batch_norm_momentum=0.1)
+        self.conv2_2 = InceptionBlock(nb_filter[2]+nb_filter[3], nb_filter[2]//2, nb_filter[2]//2, 
+        	kernel_size_1=3, kernel_size_2=3, batch_norm_momentum=0.1)
+        self.conv1_3 = InceptionBlock(nb_filter[1]+nb_filter[2], nb_filter[1]//2, nb_filter[1]//2, 
+        	kernel_size_1=3, kernel_size_2=3, batch_norm_momentum=0.1)
+        self.conv0_4 = InceptionBlock(nb_filter[0]+nb_filter[1], nb_filter[0]//2, nb_filter[0]//2, 
+        	kernel_size_1=3, kernel_size_2=3, batch_norm_momentum=0.1)
 
         self.final = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
 

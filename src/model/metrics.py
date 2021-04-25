@@ -102,13 +102,14 @@ def validate_model(model, valid_loader, save_data=False, output_path="data/model
 		return_pred=save_data,
 		return_ground_truth=save_data,
 		progress_options=dict(coloring=False))
+	print(len(results))
 	if save_data:
 		if not os.path.isdir(os.path.join(output_path, pred_folder)):
 			os.makedirs(os.path.join(output_path, pred_folder))
 		if not os.path.isdir(os.path.join(output_path, target_folder)):
 			os.makedirs(os.path.join(output_path, target_folder))
-		np.save(os.path.join(output_path, pred_folder, "predictions"), np.squeeze(results[2]))
-		np.save(os.path.join(output_path, target_folder, "targets"), np.squeeze(results[3]))
+		np.save(os.path.join(output_path, pred_folder, "predictions"), np.squeeze(results[1]))
+		np.save(os.path.join(output_path, target_folder, "targets"), np.squeeze(results[2]))
 		contest_metric_evaluation(output_path, output_path)
 	return results[0]
 

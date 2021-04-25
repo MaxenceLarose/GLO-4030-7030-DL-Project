@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader
 from model.unet import UNet
+from model.inceptionUnet import InceptionUNet
 from model.nestedUnet import NestedUNet
 from model.pretrained_unet import PretrainedUNet
 from model.segmentation_models import UNetSMP, UNetPlusPLus
@@ -77,7 +78,7 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	history_callback = HistoryCallback()
 	checkpoint_callback = ModelCheckpoint("{}_best.pt".format(save_path), save_best_only=True)
-	scheduler = ReduceLROnPlateau(patience=3, factor=0.1)
+	scheduler = ReduceLROnPlateau(patience=4, factor=0.1)
 	callbacks = [
 		history_callback, checkpoint_callback, scheduler] if callbacks is None else [
 		history_callback, checkpoint_callback, scheduler] + callbacks
@@ -148,15 +149,12 @@ if __name__ == '__main__':
 	load_network_state = False
 	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 2
+	n_epoch = 150
 	batch_size = 1
 	weight_decay = 1e-4
 	criterion = "RMSELoss"
 	optimizer = "Adam"
 	# unet setup constants
-	use_relu=False
-	mode='nearest'
-	residual_block=True
 	if batch_size == 1:
 		batch_norm_momentum = 0.01
 	else:
@@ -164,13 +162,13 @@ if __name__ == '__main__':
 	# seed
 	seed = 42
 	set_seed(seed)
-
 	# --------------------------------------------------------------------------------- #
 	#                            network                                                #
 	# --------------------------------------------------------------------------------- #
 	available_networks = [
 		"UNet",
 		"NestedUNet",
+		"InceptionUNet",
 		"SMP UnetPLusPLus",
 		"Pretrained Simple UNet",
 		"Pretrained RED_CNN"
@@ -183,14 +181,18 @@ if __name__ == '__main__':
 		nb_filter=(64, 128, 256, 512, 1024)
 		model = UNet(1, 1,
 					channels_depth_number=nb_filter,
-					use_relu=use_relu,  # If False, then LeakyReLU
-					mode=mode,  # For upsampling
-					residual_block=residual_block,  # skip connections?
+					use_relu=False,  # If False, then LeakyReLU
+					mode='nearest',  # For upsampling
+					residual_block=True,  # skip connections?
 					batch_norm_momentum=batch_norm_momentum)
 		preprocessing = None
 	elif network_to_use == "NestedUNet":
 		nb_filter=(64, 128, 256, 512, 1024)
 		model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
+		preprocessing = None
+	elif network_to_use == "InceptionUNet":
+		nb_filter=(64, 128, 256, 512, 1024)
+		model = InceptionUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[7,5,3,3,3], kernel_size_2=[5,3,3,3,1])
 		preprocessing = None
 	elif network_to_use == "SMP UnetPLusPLus":
 		encoder = "densenet121"
@@ -230,11 +232,11 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	if load_data_for_challenge:
 		train_images, test_images = load_all_images(
-			image_types=["FBP", "Phantom", "Sinogram"], n_batch=1,
+			image_types=["FBP", "Phantom", "Sinogram"], n_batch=4,
 			multiple_channels=False, load_sinograms=False, merge_datasets=False)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
 		aapm_dataset = BreastCTDataset(
-			train_images["FBP"][:100], train_images["PHANTOM"][:100], preprocessing=preprocessing)
+			train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
 		aapm_dataset_valid = BreastCTDataset(
 			valid_images_contest, valid_images_contest, preprocessing=preprocessing)
 		leonardo_dataset = None
