@@ -47,10 +47,10 @@ class History:
         _, axes = plt.subplots(num_plots, 1, sharex=True)
         plt.tight_layout()
 
-        axes[0].set_ylabel('loss')
-        axes[0].plot(epochs, self.history['loss'], label='Train')
-        axes[0].plot(epochs, self.history['train_loss'], label='Validation')
-        axes[0].legend()
+        # axes[0].set_ylabel('loss')
+        # axes[0].plot(epochs, self.history['loss'], label='Train')
+        # axes[0].plot(epochs, self.history['train_loss'], label='Validation')
+        # axes[0].legend()
 
         axes[1].set_ylabel('Loss')
         axes[1].plot(epochs, self.history['loss'], label='Train')
