@@ -130,6 +130,9 @@ class InceptionUNet(nn.Module):
 
         self.pool = nn.MaxPool2d(2, 2)
         self.up = nn.Upsample(scale_factor=2, mode='nearest')
+        self.activation_relu = nn.ReLU(inplace=True)
+        self.output_bn = nn.BatchNorm2d(num_classes, momentum=batch_norm_momentum)
+
         # Encoder
         self.conv0_0 = InceptionBlock(input_channels, nb_filter[0]//2, nb_filter[0]//2, 
         	kernel_size_1=kernel_size_1[0], kernel_size_2=kernel_size_2[0], batch_norm_momentum=0.1)
@@ -144,13 +147,13 @@ class InceptionUNet(nn.Module):
         	kernel_size_1=kernel_size_1[4], kernel_size_2=kernel_size_2[4], batch_norm_momentum=0.1)
         # decoder
         self.conv3_1 = InceptionBlock(nb_filter[3]+nb_filter[4], nb_filter[3]//2, nb_filter[3]//2, 
-        	kernel_size_1=3, kernel_size_2=3, batch_norm_momentum=0.1)
+        	kernel_size_1=kernel_size_1[3], kernel_size_2=kernel_size_2[3], batch_norm_momentum=0.1)
         self.conv2_2 = InceptionBlock(nb_filter[2]+nb_filter[3], nb_filter[2]//2, nb_filter[2]//2, 
-        	kernel_size_1=3, kernel_size_2=3, batch_norm_momentum=0.1)
+        	kernel_size_1=kernel_size_1[2], kernel_size_2=kernel_size_2[2], batch_norm_momentum=0.1)
         self.conv1_3 = InceptionBlock(nb_filter[1]+nb_filter[2], nb_filter[1]//2, nb_filter[1]//2, 
-        	kernel_size_1=3, kernel_size_2=3, batch_norm_momentum=0.1)
+        	kernel_size_1=kernel_size_1[1], kernel_size_2=kernel_size_2[1], batch_norm_momentum=0.1)
         self.conv0_4 = InceptionBlock(nb_filter[0]+nb_filter[1], nb_filter[0]//2, nb_filter[0]//2, 
-        	kernel_size_1=3, kernel_size_2=3, batch_norm_momentum=0.1)
+        	kernel_size_1=kernel_size_1[0], kernel_size_2=kernel_size_2[0], batch_norm_momentum=0.1)
 
         self.final = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
 
@@ -168,6 +171,8 @@ class InceptionUNet(nn.Module):
         x0_4 = self.conv0_4(torch.cat([x0_0, self.up(x1_3)], 1))
 
         output = self.final(x0_4)
+        output = self.output_bn(output)
+        output = self.activation_relu(output)
         #exit(0)
         return output
 
