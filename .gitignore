@@ -133,3 +133,6 @@ dmypy.json
 
 # Data
 */data
+
+# Model
+**/models_weights
