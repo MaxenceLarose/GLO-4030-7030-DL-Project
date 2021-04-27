@@ -16,6 +16,7 @@ from model.nestedUnet import NestedUNet
 from model.pretrained_unet import PretrainedUNet
 from model.segmentation_models import UNetSMP, UNetPlusPLus
 from model.RED_CNN import PretrainedREDCNN
+from model.BREAST_CNN import BreastCNN
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from deeplib.history import History
@@ -78,7 +79,7 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	history_callback = HistoryCallback()
 	checkpoint_callback = ModelCheckpoint("{}_best.pt".format(save_path), save_best_only=True)
-	scheduler = ReduceLROnPlateau(patience=4, factor=0.1)
+	scheduler = ReduceLROnPlateau(patience=5, factor=0.1)
 	callbacks = [
 		history_callback, checkpoint_callback, scheduler] if callbacks is None else [
 		history_callback, checkpoint_callback, scheduler] + callbacks
@@ -124,12 +125,12 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	if dataset_test_challenge is not None:
 		test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
-		validate_model(model, test_loader, save_data=True, output_path="data/challenge")
+		validate_model(model, test_loader, save_data=True, output_path="data/challenge", evaluate_worst_RMSE=False)
 		#draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
 	# --------------------------------------------------------------------------------- #
 	#                            save validation images                                 #
 	# --------------------------------------------------------------------------------- #
-	validate_model(model, valid_loader, save_data=True)
+	validate_model(model, valid_loader, save_data=True, evaluate_worst_RMSE=False)
 	#draw_all_preds_targets(network, valid_loader)
 	return history_callback.history
 
@@ -145,6 +146,7 @@ if __name__ == '__main__':
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
 	# training setup constants
+	use_gpu = True
 	load_data_for_challenge = True
 	load_network_state = False
 	lr = 0.0001
@@ -157,8 +159,10 @@ if __name__ == '__main__':
 	# unet setup constants
 	if batch_size == 1:
 		batch_norm_momentum = 0.01
-	else:
+	elif batch_size <= 8:
 		batch_norm_momentum = 0.05
+	else:
+		batch_norm_momentum = 0.1
 	# seed
 	seed = 42
 	set_seed(seed)
@@ -171,9 +175,10 @@ if __name__ == '__main__':
 		"InceptionUNet",
 		"SMP UnetPLusPLus",
 		"Pretrained Simple UNet",
-		"Pretrained RED_CNN"
+		"Pretrained RED_CNN",
+		"BreastCNN"
 	]
-	network_to_use: str = "UNet"
+	network_to_use: str = "InceptionUNet"
 	if network_to_use not in available_networks:
 		raise NotImplementedError(
 			f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
@@ -192,7 +197,10 @@ if __name__ == '__main__':
 		preprocessing = None
 	elif network_to_use == "InceptionUNet":
 		nb_filter=(64, 128, 256, 512, 1024)
-		model = InceptionUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[7,5,3,3,3], kernel_size_2=[5,3,3,3,1])
+		model = InceptionUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,3,3,1], kernel_size_2=[3,3,3,3,1])
+		preprocessing = None
+	elif network_to_use == "BreastCNN":
+		model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128])
 		preprocessing = None
 	elif network_to_use == "SMP UnetPLusPLus":
 		encoder = "densenet121"
@@ -213,7 +221,7 @@ if __name__ == '__main__':
 			encoder_depth=encoder_depth,
 			decoder_channels=decoder_channels,
 			encoder_weights=encoder_weights,
-			activation=activation
+			activation=None
 		)
 	elif network_to_use == "Pretrained Simple UNet":
 		model = PretrainedUNet(
@@ -226,7 +234,7 @@ if __name__ == '__main__':
 	else:
 		warnings.warn("Something very wrong happened")
 	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in model.parameters()])}")
-
+	#exit(0)
 	# --------------------------------------------------------------------------------- #
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
@@ -264,7 +272,7 @@ if __name__ == '__main__':
 		n_epoch=n_epoch,
 		batch_size=batch_size,
 		criterion=criterion,
-		use_gpu=True,
+		use_gpu=use_gpu,
 		load_network_state=load_network_state,
 		save_path="model/{}_weights".format(network_to_use),
 		dataset_test_challenge=aapm_dataset_valid,

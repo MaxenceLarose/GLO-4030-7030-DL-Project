@@ -18,7 +18,7 @@ class RMSELoss(nn.Module):
         loss = torch.sqrt(self.MSE(pred, target) + self.epsilon)
         return loss
 
-def contest_metric_evaluation(INPUT, OUT):
+def contest_metric_evaluation(INPUT, OUT, evaluate_worst_RMSE=True):
 	# INPUT which has both ./ref and ./res - user submission
 	# OUT : OUTPUT
 
@@ -61,24 +61,25 @@ def contest_metric_evaluation(INPUT, OUT):
 	im0 = 0       #tracks image index for the worst-case ROI
 
 	maxerr = -1.
-	for i in range(nim): # For each image
-		print("Searching images: %3i/%3i"%(i+1,nim), end='\r')
-		phantom = phantom_gt[i].copy() # GT
-		prediction =  prediction_phantoms[i].copy() # Pred
-		# These for loops cross every pixel in image (from region of interest)
-		for ix in range(nx-roisize):
-			for iy in range(ny-roisize):
-				roiGT =  phantom[ix:ix+roisize,iy:iy+roisize].copy() # GT
-				roiPred =  prediction[ix:ix+roisize,iy:iy+roisize].copy() # Pred
-				if roiGT.max()>0.01: #Don't search ROIs in regions where the truth image is zero
-					roirmse = np.sqrt( (((roiGT-roiPred)**2)/float(roisize**2)).sum() )
-					if roirmse>maxerr:
-						maxerr = roirmse
-						x0 = ix
-						y0 = iy
-						im0 = i
-	print("Worst-case ROI RMSE is %8.6f"%(maxerr))
-	print("Worst-case ROI location is (%3i,%3i) in image number %3i "%(x0,y0,im0+1))
+	if evaluate_worst_RMSE:
+		for i in range(nim): # For each image
+			print("Searching images: %3i/%3i"%(i+1,nim), end='\r')
+			phantom = phantom_gt[i].copy() # GT
+			prediction =  prediction_phantoms[i].copy() # Pred
+			# These for loops cross every pixel in image (from region of interest)
+			for ix in range(nx-roisize):
+				for iy in range(ny-roisize):
+					roiGT =  phantom[ix:ix+roisize,iy:iy+roisize].copy() # GT
+					roiPred =  prediction[ix:ix+roisize,iy:iy+roisize].copy() # Pred
+					if roiGT.max()>0.01: #Don't search ROIs in regions where the truth image is zero
+						roirmse = np.sqrt( (((roiGT-roiPred)**2)/float(roisize**2)).sum() )
+						if roirmse>maxerr:
+							maxerr = roirmse
+							x0 = ix
+							y0 = iy
+							im0 = i
+		print("Worst-case ROI RMSE is %8.6f"%(maxerr))
+		print("Worst-case ROI location is (%3i,%3i) in image number %3i "%(x0,y0,im0+1))
 
 	with open(os.path.join(OUT,"scores.txt"), "w") as results:
 		results.write("score_1: {}\n".format(meanrmse))
@@ -96,7 +97,7 @@ def validate(network, valid_loader, criterion, use_gpu=True, save_data=False,
 		pred_folder=pred_folder, target_folder=target_folder)
 
 def validate_model(model, valid_loader, save_data=False, output_path="data/model_trained_results",
-		pred_folder="res", target_folder="ref"):
+		pred_folder="res", target_folder="ref", evaluate_worst_RMSE=True):
 	results = model.evaluate_generator(
 		valid_loader,
 		return_pred=save_data,
@@ -110,7 +111,7 @@ def validate_model(model, valid_loader, save_data=False, output_path="data/model
 			os.makedirs(os.path.join(output_path, target_folder))
 		np.save(os.path.join(output_path, pred_folder, "predictions"), np.squeeze(results[1]))
 		np.save(os.path.join(output_path, target_folder, "targets"), np.squeeze(results[2]))
-		contest_metric_evaluation(output_path, output_path)
+		contest_metric_evaluation(output_path, output_path, evaluate_worst_RMSE=evaluate_worst_RMSE)
 	return results[0]
 
 
