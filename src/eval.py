@@ -188,7 +188,7 @@ if __name__ == '__main__':
 		criterion=criterion,
 		model_weigths_path=model_weigths_path,
 		predicted_images_save_path=save_path_for_predictions,
-		use_gpu=False
+		use_gpu=use_gpu
 	)
 
 	if debug:
