@@ -5,6 +5,7 @@ import numpy as np
 import glob
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from typing import List
 
 import torch.nn as nn
 import torch
@@ -49,14 +50,11 @@ def eval_model(
 
 	model = get_model(network, optimizer=None, criterion=loss, use_gpu=use_gpu)
 
-	logging.info("Loading weigths")
 	model.load_weights(model_weigths_path)
 
 	if use_gpu:
 		model.cuda()
 
-	logging.info("Weights loaded!")
-	logging.info("Begin validation.")
 	validate_model(
 		model,
 		test_loader,
@@ -107,115 +105,123 @@ if __name__ == '__main__':
 		"Pretrained RED_CNN",
 		"BreastCNN"
 	]
-	network_to_use: str = "UNet"
-	if network_to_use not in available_networks:
-		raise NotImplementedError(
-			f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
-	elif network_to_use == "UNet":
-		nb_filter=(64, 128, 256, 512, 1024)
-		model = UNet(1, 1,
-					channels_depth_number=nb_filter,
-					use_relu=False,  # If False, then LeakyReLU
-					mode='nearest',  # For upsampling
-					residual_block=True,  # skip connections?
-					batch_norm_momentum=batch_norm_momentum)
-		preprocessing = None
-	elif network_to_use == "NestedUNet":
-		nb_filter=(64, 128, 256, 512, 1024)
-		model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
-		preprocessing = None
-	elif network_to_use == "InceptionUNet":
-		nb_filter=(64, 128, 256, 512, 1024)
-		model = InceptionUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,3,3,1], kernel_size_2=[3,3,3,3,1])
-		preprocessing = None
-	elif network_to_use == "BreastCNN":
-		model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128])
-		preprocessing = None
-	elif network_to_use == "SMP UnetPLusPLus":
-		encoder = "densenet121"
-		encoder_weights = "imagenet"
-		activation = "logits"
-		encoder_depth = 5
-		decoder_channels = (1024, 512, 256, 128, 64)
-		preprocessing = get_preprocessing(get_preprocessing_fn(
-			encoder_name=encoder, pretrained=encoder_weights))
-		if preprocessing:
-			in_channels = 3
-		else:
-			in_channels = 1
-		model = UNetPlusPLus(
-			unfreezed_layers=["encoder", "decoder"],
-			in_channels=in_channels,
-			encoder=encoder,
-			encoder_depth=encoder_depth,
-			decoder_channels=decoder_channels,
-			encoder_weights=encoder_weights,
-			activation=None
-		)
-	elif network_to_use == "Pretrained Simple UNet":
-		model = PretrainedUNet(
-			1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
-		)
-		preprocessing = None
-	elif network_to_use == "Pretrained RED_CNN":
-		model = PretrainedREDCNN(unfreezed_layers=["conv", "tconv"])
-		preprocessing = None
-	else:
-		warnings.warn("Something very wrong happened")
-	logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in model.parameters()])}")
 
-	# --------------------------------------------------------------------------------- #
-	#                            dataset                                                #
-	# --------------------------------------------------------------------------------- #
-	if eval_train_images:
-		train_images, _ = load_all_images(n_batch=n_data_batch)
-		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+	networks_to_use: List[str] = [
+		"UNet",
+		"NestedUNet",
+		"InceptionUNet",
+		"Pretrained RED_CNN"
+	]
+
+	for network_to_use in networks_to_use:
+		if network_to_use not in available_networks:
+			raise NotImplementedError(
+				f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
+		elif network_to_use == "UNet":
+			nb_filter=(64, 128, 256, 512, 1024)
+			model = UNet(1, 1,
+						channels_depth_number=nb_filter,
+						use_relu=False,  # If False, then LeakyReLU
+						mode='nearest',  # For upsampling
+						residual_block=True,  # skip connections?
+						batch_norm_momentum=batch_norm_momentum)
+			preprocessing = None
+		elif network_to_use == "NestedUNet":
+			nb_filter=(64, 128, 256, 512, 1024)
+			model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
+			preprocessing = None
+		elif network_to_use == "InceptionUNet":
+			nb_filter=(64, 128, 256, 512, 1024)
+			model = InceptionUNet(1, 1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,3,3,1], kernel_size_2=[3,3,3,3,1])
+			preprocessing = None
+		elif network_to_use == "BreastCNN":
+			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128])
+			preprocessing = None
+		elif network_to_use == "SMP UnetPLusPLus":
+			encoder = "densenet121"
+			encoder_weights = "imagenet"
+			activation = "logits"
+			encoder_depth = 5
+			decoder_channels = (1024, 512, 256, 128, 64)
+			preprocessing = get_preprocessing(get_preprocessing_fn(
+				encoder_name=encoder, pretrained=encoder_weights))
+			if preprocessing:
+				in_channels = 3
+			else:
+				in_channels = 1
+			model = UNetPlusPLus(
+				unfreezed_layers=["encoder", "decoder"],
+				in_channels=in_channels,
+				encoder=encoder,
+				encoder_depth=encoder_depth,
+				decoder_channels=decoder_channels,
+				encoder_weights=encoder_weights,
+				activation=None
+			)
+		elif network_to_use == "Pretrained Simple UNet":
+			model = PretrainedUNet(
+				1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
+			)
+			preprocessing = None
+		elif network_to_use == "Pretrained RED_CNN":
+			model = PretrainedREDCNN(unfreezed_layers=["conv", "tconv"])
+			preprocessing = None
+		else:
+			warnings.warn("Something very wrong happened")
+		logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in model.parameters()])}")
+
+		# --------------------------------------------------------------------------------- #
+		#                            dataset                                                #
+		# --------------------------------------------------------------------------------- #
+		if eval_train_images:
+			train_images, _ = load_all_images(n_batch=n_data_batch)
+			aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
+
+			if debug:
+				aapm_dataset = Subset(aapm_dataset, [0, 1])
+
+			test_loader = DataLoader(aapm_dataset, batch_size=batch_size, shuffle=True)
+
+		# --------------------------------------------------------------------------------- #
+		#                            network prediction                                     #
+		# --------------------------------------------------------------------------------- #
+		model_weigths_path = "model/models_weights/{}_weights_best.pt".format(network_to_use)
+		save_path_for_predictions = "results/{}/train_images_prediction".format(network_to_use)
+
+		logging.info(f"Begin validation of network {network_to_use}.")
+		eval_model(
+			network=model,
+			test_loader=test_loader,
+			criterion=criterion,
+			model_weigths_path=model_weigths_path,
+			predicted_images_save_path=save_path_for_predictions,
+			use_gpu=use_gpu
+		)
 
 		if debug:
-			aapm_dataset = Subset(aapm_dataset, [0, 1])
+			files_target = os.path.join(save_path_for_predictions, "{}/{}.npy".format("ref", "targets"))
+			files_predicts = os.path.join(save_path_for_predictions, "{}/{}.npy".format("res", "predictions"))
 
-		test_loader = DataLoader(aapm_dataset, batch_size=batch_size, shuffle=True)
+			targets_images = np.load(files_target)
+			predictions_images = np.load(files_predicts)
 
-	# --------------------------------------------------------------------------------- #
-	#                            network prediction                                     #
-	# --------------------------------------------------------------------------------- #
-	model_weigths_path = "model/models_weights/{}_weights_best.pt".format(network_to_use)
-	save_path_for_predictions = "results/{}/train_images_prediction".format(network_to_use)
+			random_idx = np.random.randint(len(targets_images))
+			target_image = targets_images[random_idx]
+			pred_image = predictions_images[random_idx]
 
-	eval_model(
-		network=model,
-		test_loader=test_loader,
-		criterion=criterion,
-		model_weigths_path=model_weigths_path,
-		predicted_images_save_path=save_path_for_predictions,
-		use_gpu=use_gpu
-	)
+			fig, ax = plt.subplots(1, 2, figsize=(12, 8))
+			size_split = 10
+			# target
+			im1 = ax[0].imshow(target_image, cmap='Greys')
+			divider1 = make_axes_locatable(ax[0])
+			cax1 = divider1.append_axes("right", size="{}%".format(size_split), pad=0.05)
+			cbar1 = plt.colorbar(im1, cax=cax1)
+			ax[0].set_title("Target")
 
-	if debug:
-		files_target = os.path.join(save_path_for_predictions, "{}/{}.npy".format("ref", "targets"))
-		files_predicts = os.path.join(save_path_for_predictions, "{}/{}.npy".format("res", "predictions"))
-
-		targets_images = np.load(files_target)
-		predictions_images = np.load(files_predicts)
-
-		random_idx = np.random.randint(len(targets_images))
-		target_image = targets_images[random_idx]
-		pred_image = predictions_images[random_idx]
-
-		fig, ax = plt.subplots(1, 2, figsize=(12, 8))
-		size_split = 10
-		# target
-		im1 = ax[0].imshow(target_image, cmap='Greys')
-		divider1 = make_axes_locatable(ax[0])
-		cax1 = divider1.append_axes("right", size="{}%".format(size_split), pad=0.05)
-		cbar1 = plt.colorbar(im1, cax=cax1)
-		ax[0].set_title("Target")
-
-		# prediction
-		im2 = ax[1].imshow(pred_image, cmap='Greys')
-		divider2 = make_axes_locatable(ax[1])
-		cax2 = divider2.append_axes("right", size="{}%".format(size_split), pad=0.05)
-		cbar2 = plt.colorbar(im2, cax=cax2)
-		ax[1].set_title("Prediction")
-		plt.show()
-
+			# prediction
+			im2 = ax[1].imshow(pred_image, cmap='Greys')
+			divider2 = make_axes_locatable(ax[1])
+			cax2 = divider2.append_axes("right", size="{}%".format(size_split), pad=0.05)
+			cbar2 = plt.colorbar(im2, cax=cax2)
+			ax[1].set_title("Prediction")
+			plt.show()
