@@ -65,7 +65,7 @@ class PairwiseRandomRotation(RandomRotation):
 def get_transformed_image_and_target(
         image: np.ndarray,
         mask: np.ndarray,
-        show: bool = False
+        show: bool = True
 ) -> Tuple[np.ndarray, np.ndarray]:
 
     transform = PairwiseCompose([
@@ -74,13 +74,20 @@ def get_transformed_image_and_target(
 
     transformed_image, transformed_mask = transform(input=[torch.from_numpy(image), torch.from_numpy(mask)])
     if show:
-        plt.imshow(image[0, :, :], cmap="Greys")
+        image_idx = 71
+
+        fig, ax = plt.subplots(1, 2, figsize=(12, 8))
+        ax[0].imshow(image[image_idx, :, :], cmap="Greys")
+        ax[0].set_title("image")
+        ax[1].imshow(transformed_image[image_idx, :, :], cmap="Greys")
+        ax[1].set_title("transformed_image")
         plt.show()
-        plt.imshow(transformed_image[0, :, :], cmap="Greys")
-        plt.show()
-        plt.imshow(mask[0, :, :], cmap="Greys")
-        plt.show()
-        plt.imshow(transformed_mask[0, :, :], cmap="Greys")
+
+        fig, ax = plt.subplots(1, 2, figsize=(12, 8))
+        ax[0].imshow(mask[image_idx, :, :], cmap="Greys")
+        ax[0].set_title("mask")
+        ax[1].imshow(transformed_mask[image_idx, :, :], cmap="Greys")
+        ax[1].set_title("transformed_mask")
         plt.show()
 
     return transformed_image.numpy(), transformed_mask.numpy()
