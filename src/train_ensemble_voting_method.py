@@ -1,5 +1,7 @@
 import logging
 import pprint
+import numpy as np
+
 from data_loader.data_loaders import load_all_images
 from model.ensemble_voting_methods import EnsembleVoting
 from torch.utils.data import DataLoader, Dataset
@@ -30,13 +32,16 @@ if __name__ == '__main__':
     # dataset constants
     batch_size = 1
 
+    # Models
+    models = ["InceptionUNet", "NestedUNet", "UNet"]
+
     # Methods
     available_methods = [
         "WeightedAverage",
         "FCLayers",
         "CNN"
     ]
-    method = available_methods[2]
+    method = available_methods[0]
 
     # Number of networks in the ensemble
     ensemble_size = 3
@@ -46,11 +51,19 @@ if __name__ == '__main__':
     set_seed(seed)
 
     # --------------------------------------------------------------------------------- #
+    #                              Models scores                                        #
+    # --------------------------------------------------------------------------------- #
+    models_loss: list = [
+        np.loadtxt(fname=f"results/{model}/train_images_prediction/scores.txt", usecols=1)[0] for model in models
+    ]
+
+    # --------------------------------------------------------------------------------- #
     #                                 Ensemble                                          #
     # --------------------------------------------------------------------------------- #
     ensemble_voting = EnsembleVoting(
         method=method,
-        input_shape=(ensemble_size, 512, 512)
+        input_shape=(ensemble_size, 512, 512),
+        loss_rmse=models_loss
     )
 
     # --------------------------------------------------------------------------------- #
@@ -60,11 +73,11 @@ if __name__ == '__main__':
     # the numbers of models in the set method, while the width and height are the size of the image.
 
     train_images, _test_images = load_result_images(
-        models=["InceptionUNet", "NestedUNet", "UNet"],
+        models=models,
         image_types=["predictions", "targets"],
         multiple_channels=True,
         n_batch=1,
-        ratio_of_images_to_use=0.1
+        ratio_of_images_to_use=0.005
     )
 
     train_valid_dataset = BreastCTDataset(
@@ -80,6 +93,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------- #
     history = ensemble_voting.train_network(
         loaders=loaders,
+        initialization="Constant",
         lr=lr,
         epochs=epochs,
         weight_decay=weight_decay

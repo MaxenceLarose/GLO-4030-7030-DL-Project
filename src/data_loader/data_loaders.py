@@ -204,6 +204,6 @@ def load_result_images(
 	logging.info(f"\nFinal shape of train images for predictions: {train_images['PREDICTIONS'].shape}.")
 	logging.info(f"Final shape of train images for targets: {test_images['TARGETS'].shape}.")
 	logging.info(f"Final shape of test images for predictions: {train_images['PREDICTIONS'].shape}.")
-	logging.info(f"Final shape of test images for targets: {test_images['TARGETS'].shape}.")
+	logging.info(f"Final shape of test images for targets: {test_images['TARGETS'].shape}.\n")
 
 	return train_images, test_images
