@@ -1,12 +1,33 @@
 import numpy as np
 from typing import Tuple, List, Dict
 import logging
-import pprint
+from typing import Callable
 
 import poutyne as pt
 import torch
 import torch.nn as nn
+import torch.nn.init as init
 from torch.utils.data import DataLoader
+
+
+def initialize_network_(network: nn.Module, initialization_function_: Callable, **func_kwargs):
+    """
+    Function used to initialize the weights of a neural network with the given initialization function.
+    The bias weights will be initialized to zero.
+
+    Args :
+        network: The neural network that will be initialized.
+        initialization_function_: The initialization function. A callable that take weights as a torch.Tensor and
+                                  other kwargs. The modification must be done inplace.
+        func_kwargs: The kwargs of the initialization function.
+
+    Returns :
+        None
+    """
+    for module in network.modules():
+        if isinstance(module, nn.Conv2d):
+            initialization_function_(module.weight, **func_kwargs)
+            init.zeros_(module.bias)
 
 
 class WeightedAverage(object):
@@ -111,7 +132,7 @@ class EnsembleVoting(object):
         self.kwargs = kwargs
         self.network = None
 
-        self._method = method
+        self.method = method
 
     @property
     def method(self) -> str:
@@ -151,14 +172,22 @@ class EnsembleVoting(object):
     def train_network(
             self,
             loaders: Dict[str, DataLoader],
-            save_path="model/ensemble_method_model/",
+            save_path="model/ensemble_method_models_weights/",
             **training_kwargs
     ):
         if self._method == self.available_methods[0]:
             logging.info(f"The {self._method} doesn't require training. Use the test_network function.")
             return []
         else:
+
+            init_funcs = {
+                "Constant": dict(func=init.constant_, func_kwargs=dict(val=1/self.input_shape[0])),
+            }
+
+            params = init_funcs[training_kwargs.get("initialization", "Constant")]
+            initialize_network_(self.network, params["func"], **params["func_kwargs"])
             params = [p for p in self.network.parameters() if p.requires_grad]
+
             if len(params) == 0:
                 exec_training = False
             else:
@@ -183,16 +212,15 @@ class EnsembleVoting(object):
                     callbacks=[scheduler],
                 )
 
+                # TODO : Add a way to create the folder at save_path if it doesn't already exists
                 model.save_weights(f"{save_path}/{self._method}.pt")
-
-                logging.info(f"history: \n{pprint.pformat(history, indent=4)}")
 
                 return history
 
     def test_network(
             self,
             loaders: Dict[str, DataLoader],
-            save_path="model/ensemble_method_model/"
+            save_path="model/ensemble_method_models_weights/"
     ) -> tuple:
         if self._method == self.available_methods[0]:
             model = self.network
