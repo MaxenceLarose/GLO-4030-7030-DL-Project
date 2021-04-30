@@ -1,18 +1,40 @@
 import numpy as np
+import os
 from typing import Tuple, List, Dict
 import logging
-import pprint
+from typing import Callable
 
 import poutyne as pt
 import torch
 import torch.nn as nn
+import torch.nn.init as init
 from torch.utils.data import DataLoader
 
 
-class WeightedAverage(object):
+def initialize_network_(network: nn.Module, initialization_function_: Callable, **func_kwargs):
+    """
+    Function used to initialize the weights of a neural network with the given initialization function.
+    The bias weights will be initialized to zero.
+
+    Args :
+        network: The neural network that will be initialized.
+        initialization_function_: The initialization function. A callable that take weights as a torch.Tensor and
+                                  other kwargs. The modification must be done inplace.
+        func_kwargs: The kwargs of the initialization function.
+
+    Returns :
+        None
+    """
+    for module in network.modules():
+        if isinstance(module, nn.Conv2d):
+            initialization_function_(module.weight, **func_kwargs)
+            init.zeros_(module.bias)
+
+
+class WeightedAverage(nn.Module):
     def __init__(
             self,
-            loss_rmse: List[List],
+            loss_rmse: List[float],
             input_shape: Tuple[int, int, int],
     ):
         super().__init__()
@@ -22,18 +44,25 @@ class WeightedAverage(object):
                              "to be calculated and given as a list of lists of losses to this class.")
 
         self.loss_rmse = loss_rmse
-        self.weights = np.zeros(input_shape[0])
+
+        self.weights = np.zeros((1, input_shape[0], 1, 1))
+        self.update_weights()
+
         self.conv1 = nn.Conv2d(input_shape[0], 1, kernel_size=1, padding=0)
+
+        self.conv1.weight = torch.nn.Parameter(torch.tensor(self.weights, dtype=torch.float32), requires_grad=False)
+        self.conv1.bias.data = torch.tensor(np.array([0]))
+        self.conv1.bias.requires_grad = False
+
         self.relu1 = nn.ReLU()
 
-    def get_model_specific_weighted(self):
-        weights = np.average(np.array(self.loss_rmse))
+    def update_weights(self) -> None:
+        total_loss = np.sum(np.array(self.loss_rmse))
 
-        return weights
+        for idx, loss in enumerate(self.loss_rmse):
+            self.weights[0, idx, 0, 0] = loss/total_loss
 
-    def evaluate_generator(self, x):
-        self.weights = self.get_model_specific_weighted()
-        self.conv1.weight = torch.nn.Parameter(torch.from_numpy(self.weights))
+    def forward(self, x):
         out = self.conv1(x)
         out = self.relu1(out)
 
@@ -78,7 +107,7 @@ class CNNVote(nn.Module):
 
 
 class EnsembleVoting(object):
-    def __init__(self, method: str, input_shape: Tuple[int, int, int], loss_rmse: List[List] = None, **kwargs):
+    def __init__(self, method: str, input_shape: Tuple[int, int, int], loss_rmse: List[float] = None, **kwargs):
         """
         Constructor of the class VotingEnsemble.
 
@@ -88,9 +117,9 @@ class EnsembleVoting(object):
             input_shape (Tuple[int, int, int]): The input shape of the network. For example, if the size of the images
                                                 are 512x512 and there is 3 models in the ensemble, the input_shape must
                                                 be (3, 512, 512).
-            loss_rmse (List[List]): If the chosen method is 'WeightedAverage', the value of this variable needs to be
-                                    given. The loss_rmse should be given in the form of a list of loss lists. Each list
-                                    contains every RMSE loss value associated with the training images. All models used
+            loss_rmse (List[float]): If the chosen method is 'WeightedAverage', the value of this variable needs to be
+                                    given. The loss_rmse should be given in the form of a list of loss. The loss is
+                                    given as an RMSE loss value associated with the training images. All models used
                                     in the ensemble must therefore be evaluated with the training images to obtain this
                                     list. (Default = None)
 
@@ -111,7 +140,7 @@ class EnsembleVoting(object):
         self.kwargs = kwargs
         self.network = None
 
-        self._method = method
+        self.method = method
 
     @property
     def method(self) -> str:
@@ -151,14 +180,24 @@ class EnsembleVoting(object):
     def train_network(
             self,
             loaders: Dict[str, DataLoader],
-            save_path="model/ensemble_method_model/",
+            save_path="model/ensemble_method_models_weights/",
             **training_kwargs
-    ):
+    ) -> List[Dict]:
         if self._method == self.available_methods[0]:
-            logging.info(f"The {self._method} doesn't require training. Use the test_network function.")
+            logging.info(f"\nThe {self._method} doesn't require training. Use the test_network function.")
             return []
         else:
+
+            init_funcs = {
+                "Constant": dict(func=init.constant_, func_kwargs=dict(val=1/self.input_shape[0])),
+                "Xavier_Normal": dict(func=init.xavier_normal_, func_kwargs=dict(gain=1)),
+                "Kaiming_Uniform": dict(func=init.kaiming_normal_, func_kwargs=dict(a=1)),
+            }
+
+            params = init_funcs[training_kwargs.get("initialization", "Constant")]
+            initialize_network_(self.network, params["func"], **params["func_kwargs"])
             params = [p for p in self.network.parameters() if p.requires_grad]
+
             if len(params) == 0:
                 exec_training = False
             else:
@@ -168,7 +207,7 @@ class EnsembleVoting(object):
                 optimizer = torch.optim.Adam(
                     params,
                     lr=training_kwargs.get("lr", 1e-3),
-                    weight_decay=training_kwargs.get("weight_decay", 1e-3),
+                    weight_decay=training_kwargs.get("weight_decay", 1e-2),
                 )
                 model = pt.Model(self.network, optimizer, 'MSELoss', batch_metrics=['accuracy'])
                 if torch.cuda.is_available():
@@ -183,24 +222,29 @@ class EnsembleVoting(object):
                     callbacks=[scheduler],
                 )
 
-                model.save_weights(f"{save_path}/{self._method}.pt")
+                logging.info(f"\nModel final weights are \n{model.get_weights()}.")
 
-                logging.info(f"history: \n{pprint.pformat(history, indent=4)}")
+                folder_path = os.path.join(os.getcwd(), save_path)
+                if not os.path.exists(folder_path):
+                    os.mkdir(folder_path)
+
+                model.save_weights(f"{save_path}/{self._method}.pt")
 
                 return history
 
     def test_network(
             self,
             loaders: Dict[str, DataLoader],
-            save_path="model/ensemble_method_model/"
+            save_path="model/ensemble_method_models_weights/"
     ) -> tuple:
         if self._method == self.available_methods[0]:
-            model = self.network
-            test_metrics = model.evaluate_generator(loaders["test"])
-
+            model = pt.Model(self.network, optimizer=None, loss_function='MSELoss', batch_metrics=["Accuracy"])
         else:
-            model = pt.Model(self.network, optimizer=None, loss_function=None, batch_metrics=["accuracy"])
+            model = pt.Model(self.network, optimizer=None, loss_function='MSELoss', batch_metrics=["Accuracy"])
             model.load_weights(f"{save_path}/{self._method}.pt")
-            test_metrics = model.evaluate_generator(loaders["test"])
+
+        logging.info(f"\nModel weights are \n{model.get_weights()}.\n")
+
+        test_metrics = model.evaluate_generator(loaders["test"])
 
         return test_metrics

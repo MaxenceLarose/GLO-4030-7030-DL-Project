@@ -136,3 +136,7 @@ dmypy.json
 
 # Model
 **/models_weights
+**/ensemble_method_models_weights
+
+# Results
+*/results
