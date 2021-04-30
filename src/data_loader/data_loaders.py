@@ -36,6 +36,7 @@ def load_images(image_type : str, path : str="data", n_batch=4) -> np.ndarray:
 		data.append(batch)
 	data = np.concatenate(tuple(data))
 	data = data.reshape(data.shape[0], 1, data.shape[1], data.shape[2])
+	print(np.where(data > 1e10))
 	return data
 
 
@@ -106,6 +107,18 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 		except KeyError:
 			train_images["DIFF"] = train_images["DATA_LEO_DIFF"]
 			test_images["DIFF"] = test_images["DATA_LEO_DIFF"]
+
+	if "AUG" in train_images.keys() and "AUG_TARGET":
+		try:
+			train_images["FBP"] = np.concatenate((train_images["FBP"], train_images["AUG"]), axis=0)
+			train_images["PHANTOM"] = np.concatenate((train_images["PHANTOM"], train_images["AUG_TARGET"]), axis=0)
+
+		except KeyError:
+			train_images["FBP"] = train_images["AUG"]
+			train_images["PHANTOM"] = train_images["AUG_TARGET"]
+			test_images["FBP"] = test_images["AUG"]
+			test_images["PHANTOM"] = test_images["AUG_TARGET"]
+
 	print(train_images.keys())
 	# shuffle
 	print(len(train_images["FBP"]))
