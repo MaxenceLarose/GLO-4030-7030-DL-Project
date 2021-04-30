@@ -47,8 +47,6 @@ class WeightedAverage(nn.Module):
 
         self.weights = np.zeros((1, input_shape[0], 1, 1))
         self.update_weights()
-        print(self.weights)
-        exit()
 
         self.conv1 = nn.Conv2d(input_shape[0], 1, kernel_size=1, padding=0)
 
