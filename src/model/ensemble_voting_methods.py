@@ -47,6 +47,8 @@ class WeightedAverage(nn.Module):
 
         self.weights = np.zeros((1, input_shape[0], 1, 1))
         self.update_weights()
+        print(self.weights)
+        exit()
 
         self.conv1 = nn.Conv2d(input_shape[0], 1, kernel_size=1, padding=0)
 
@@ -60,7 +62,7 @@ class WeightedAverage(nn.Module):
         total_loss = np.sum(np.array(self.loss_rmse))
 
         for idx, loss in enumerate(self.loss_rmse):
-            self.weights[0, idx, 0, 0] = loss/total_loss
+            self.weights[0, idx, 0, 0] = - loss/total_loss + 2/len(self.loss_rmse)
 
     def forward(self, x):
         out = self.conv1(x)
