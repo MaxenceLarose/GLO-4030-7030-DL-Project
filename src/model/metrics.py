@@ -125,16 +125,19 @@ def validate_2(network, valid_loader, criterion, use_gpu=True, save_data=False, 
 	if not use_gpu:
 		network.cpu()
 	with torch.no_grad():
-		for inputs, targets in valid_loader:
+		for i, (inputs, targets) in enumerate(valid_loader):
 			if use_gpu:
 				inputs = inputs.cuda()
 				targets = targets.cuda()
 			pred = network(inputs)
-			loss.append(criterion(pred, targets))
+			if type(pred) is list:
+				pred = pred[0]
+			tmp_loss = criterion(pred, targets)
+			loss.append(tmp_loss)
 			targets = targets.cpu().numpy()
 			pred = pred.cpu().numpy()
-			for i in range(targets.shape[0]):
-				RMSE.append(np.sqrt((((targets[i][0] - pred[i][0])**2/(pred.shape[2] * pred.shape[3])).sum(axis=1)).sum(axis=0)).mean())
+			# for i in range(targets.shape[0]):
+			# 	RMSE.append(np.sqrt((((targets[i][0] - pred[i][0])**2/(pred.shape[2] * pred.shape[3])).sum(axis=1)).sum(axis=0)).mean())
 				#RMSE.append(mean_squared_error(targets[i][0], pred[i][0], squared=False))
 			if save_data:
 				store_preds.append(pred.reshape(pred.shape[0], pred.shape[2], pred.shape[3]))
@@ -152,4 +155,4 @@ def validate_2(network, valid_loader, criterion, use_gpu=True, save_data=False, 
 			store_targets = np.concatenate(tuple(store_targets))
 			np.save(os.path.join(output_path, target_folder, "targets"), store_targets)
 		contest_metric_evaluation(output_path, output_path)
-	return torch.mean(loss), np.mean(RMSE)
+	return torch.mean(loss)

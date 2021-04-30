@@ -60,6 +60,7 @@ def eval_model(
 		test_loader,
 		save_data=True,
 		output_path=predicted_images_save_path,
+		evaluate_worst_RMSE=False
 	)
 
 

@@ -40,6 +40,14 @@ def draw_data_targets(dataset : Dataset, image_idx=0):
 	ax[1].set_title("Target")
 	plt.show()
 
+def draw_data_targets_2(data, target, image_idx=0):
+	fig, ax = plt.subplots(1, 2)
+	ax[0].imshow(data[0][0])
+	ax[0].set_title("Data")
+	ax[1].imshow(target[0][0])
+	ax[1].set_title("Target")
+	plt.show()
+
 
 def draw_pred_target(inputs, targets, pred, image_idx=0, fig_id=0, output_path=os.path.relpath("../Figures")):
 	image_id = "{}/pred_valid_{}".format(output_path, fig_id)

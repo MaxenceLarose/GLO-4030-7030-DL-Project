@@ -17,7 +17,9 @@ from model.pretrained_unet import PretrainedUNet
 from model.segmentation_models import UNetSMP, UNetPlusPLus
 from model.RED_CNN import PretrainedREDCNN
 from model.BREAST_CNN import BreastCNN
+from model.inceptionNet import InceptionNet
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
+from utils.data_augmentation import save_augmented_dataset
 
 from deeplib.history import History
 from deeplib.training import HistoryCallback, get_model
@@ -79,7 +81,7 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	history_callback = HistoryCallback()
 	checkpoint_callback = ModelCheckpoint("{}_best.pt".format(save_path), save_best_only=True)
-	scheduler = ReduceLROnPlateau(patience=5, factor=0.1)
+	scheduler = ReduceLROnPlateau(patience=3, factor=0.5)
 	callbacks = [
 		history_callback, checkpoint_callback, scheduler] if callbacks is None else [
 		history_callback, checkpoint_callback, scheduler] + callbacks
@@ -141,7 +143,8 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	logs_file_setup(__file__, logging.INFO)
 	log_device_setup()
-
+	#save_augmented_dataset()
+	#exit(0)
 	# --------------------------------------------------------------------------------- #
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
@@ -173,9 +176,11 @@ if __name__ == '__main__':
 		"UNet",
 		"NestedUNet",
 		"InceptionUNet",
+		"InceptionNet",
 		"SMP UnetPLusPLus",
 		"Pretrained Simple UNet",
 		"Pretrained RED_CNN",
+		"BreastUNet",
 		"BreastCNN"
 	]
 	network_to_use: str = "InceptionUNet"
@@ -197,10 +202,17 @@ if __name__ == '__main__':
 		preprocessing = None
 	elif network_to_use == "InceptionUNet":
 		nb_filter=(64, 128, 256, 512, 1024)
-		model = InceptionUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,3,3,1], kernel_size_2=[3,3,3,3,1])
+		model = InceptionUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,5,5,5], kernel_size_2=[3,3,3,3,3])
+		preprocessing = None
+	elif network_to_use == "InceptionNet":
+		model = InceptionNet(1, 1, 64, n_inception_blocks=5, batch_norm_momentum=batch_norm_momentum,
+			use_maxpool=True)
+		preprocessing = None
+	elif network_to_use == "BreastUNet":
+		model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[64, 128, 256], unet_arch=True)
 		preprocessing = None
 	elif network_to_use == "BreastCNN":
-		model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128])
+		model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[64, 128, 256], unet_arch=False)
 		preprocessing = None
 	elif network_to_use == "SMP UnetPLusPLus":
 		encoder = "densenet121"
