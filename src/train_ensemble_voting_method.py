@@ -63,7 +63,9 @@ if __name__ == '__main__':
     ensemble_voting = EnsembleVoting(
         method=method,
         input_shape=(ensemble_size, 512, 512),
-        loss_rmse=models_loss
+        loss_rmse=models_loss,
+        kernel_size=1,
+        padding=0
     )
 
     # --------------------------------------------------------------------------------- #
@@ -77,7 +79,7 @@ if __name__ == '__main__':
         image_types=["predictions", "targets"],
         multiple_channels=True,
         n_batch=1,
-        ratio_of_images_to_use=0.005
+        ratio_of_images_to_use=1
     )
 
     train_valid_dataset = BreastCTDataset(

@@ -207,7 +207,7 @@ class EnsembleVoting(object):
                 optimizer = torch.optim.Adam(
                     params,
                     lr=training_kwargs.get("lr", 1e-3),
-                    weight_decay=training_kwargs.get("weight_decay", 1e-3),
+                    weight_decay=training_kwargs.get("weight_decay", 1e-2),
                 )
                 model = pt.Model(self.network, optimizer, 'MSELoss', batch_metrics=['accuracy'])
                 if torch.cuda.is_available():
