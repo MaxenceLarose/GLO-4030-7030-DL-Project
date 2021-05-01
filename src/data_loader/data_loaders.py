@@ -148,7 +148,6 @@ def load_result_images(
 		train_split: float = 0.9,
 		clip: bool = False,
 		load_sinograms=False,
-		multiple_channels=True,
 		merge_datasets=False,
 		ratio_of_images_to_use=1
 ) -> tuple:
@@ -178,41 +177,61 @@ def load_result_images(
 			else:
 				raise ValueError("Image type is not allowed.")
 
-			tmp_images = load_images(
-				image_type=f"{model}/train_images_prediction/{sub_file_name}/{image_type}",
-				path=path,
-				n_batch=n_batch
-			)
+			if idx == 0:
+				tmp_images = load_images(
+					image_type=f"{model}/train_images_prediction/{sub_file_name}/{image_type}",
+					path=path,
+					n_batch=n_batch
+				)
 
-			if clip:
-				tmp_images = np.clip(tmp_images, 0, 1)
+				if clip:
+					tmp_images = np.clip(tmp_images, 0, 1)
 
-			total_examples = tmp_images.shape[0]
-			number_images_to_use = int(round(total_examples * ratio_of_images_to_use))
-			logging.info(f"Using {number_images_to_use} images from model {model} as {image_type}.")
-			tmp_images = tmp_images[:number_images_to_use]
+				total_examples = tmp_images.shape[0]
+				number_images_to_use = int(round(total_examples * ratio_of_images_to_use))
+				logging.info(f"Using {number_images_to_use} images from model {model} as {image_type}.")
+				tmp_images = tmp_images[:number_images_to_use]
 
-			n_examples = tmp_images.shape[0]
-			model_train_images[f"{model}_{image_type}"] = tmp_images[:int(train_split * n_examples)]
-			model_test_images[f"{model}_{image_type}"] = tmp_images[int(train_split * n_examples):]
+				n_examples = tmp_images.shape[0]
+				model_train_images[f"{model}_{image_type}"] = tmp_images[:int(train_split * n_examples)]
+				model_test_images[f"{model}_{image_type}"] = tmp_images[int(train_split * n_examples):]
 
-			if multiple_channels:
-				if idx == 0:
-					train_images[image_type.upper()] = model_train_images[f"{model}_{image_type}"].copy()
-					test_images[image_type.upper()] = model_test_images[f"{model}_{image_type}"].copy()
-				else:
-					train_images[image_type.upper()] = np.concatenate(
-						(train_images[image_type.upper()].copy(), model_train_images[f"{model}_{image_type}"].copy()),
-						axis=1
-					)
+				train_images[image_type.upper()] = model_train_images[f"{model}_{image_type}"].copy()
+				test_images[image_type.upper()] = model_test_images[f"{model}_{image_type}"].copy()
 
-					test_images[image_type.upper()] = np.concatenate(
-						(test_images[image_type.upper()].copy(), model_test_images[f"{model}_{image_type}"].copy()),
-						axis=1
-					)
+			elif image_type == "predictions":
+				tmp_images = load_images(
+					image_type=f"{model}/train_images_prediction/{sub_file_name}/{image_type}",
+					path=path,
+					n_batch=n_batch
+				)
 
-				logging.info(f"Current shape of train images for {image_type}:{train_images[image_type.upper()].shape}.")
-				logging.info(f"Current shape of test images for {image_type}:{test_images[image_type.upper()].shape}.")
+				if clip:
+					tmp_images = np.clip(tmp_images, 0, 1)
+
+				total_examples = tmp_images.shape[0]
+				number_images_to_use = int(round(total_examples * ratio_of_images_to_use))
+				logging.info(f"Using {number_images_to_use} images from model {model} as {image_type}.")
+				tmp_images = tmp_images[:number_images_to_use]
+
+				n_examples = tmp_images.shape[0]
+				model_train_images[f"{model}_{image_type}"] = tmp_images[:int(train_split * n_examples)]
+				model_test_images[f"{model}_{image_type}"] = tmp_images[int(train_split * n_examples):]
+
+				train_images[image_type.upper()] = np.concatenate(
+					(train_images[image_type.upper()].copy(), model_train_images[f"{model}_{image_type}"].copy()),
+					axis=1
+				)
+
+				test_images[image_type.upper()] = np.concatenate(
+					(test_images[image_type.upper()].copy(), model_test_images[f"{model}_{image_type}"].copy()),
+					axis=1
+				)
+			else:
+				logging.info("\nThis model targets images are not used.")
+
+			logging.info(f"Current shape of train images for {image_type}:{train_images[image_type.upper()].shape}.")
+			logging.info(f"Current shape of test images for {image_type}:{test_images[image_type.upper()].shape}.")
 
 	logging.info(f"\nFinal shape of train images for predictions: {train_images['PREDICTIONS'].shape}.")
 	logging.info(f"Final shape of train images for targets: {test_images['TARGETS'].shape}.")

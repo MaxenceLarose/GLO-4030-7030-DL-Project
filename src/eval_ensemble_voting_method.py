@@ -72,9 +72,8 @@ if __name__ == '__main__':
     _train_images, test_images = load_result_images(
         models=models,
         image_types=["predictions", "targets"],
-        multiple_channels=True,
         n_batch=1,
-        ratio_of_images_to_use=0.005
+        ratio_of_images_to_use=1
     )
 
     test_dataset = BreastCTDataset(
@@ -93,4 +92,4 @@ if __name__ == '__main__':
         loaders=loaders,
     )
 
-    logging.info(f"Loss (MSE): {test_acc[0]}, Accuracy: {test_acc[1]}")
+    logging.info(f"Loss (RMSE): {test_acc}")

@@ -77,7 +77,6 @@ if __name__ == '__main__':
     train_images, _test_images = load_result_images(
         models=models,
         image_types=["predictions", "targets"],
-        multiple_channels=True,
         n_batch=1,
         ratio_of_images_to_use=1
     )
