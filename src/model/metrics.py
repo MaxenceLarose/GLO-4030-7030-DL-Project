@@ -38,7 +38,7 @@ class SSIMLoss(nn.Module):
 		self.SSIM = ssim
 
 	def forward(self, pred, target):
-		loss = self.SSIM(target.numpy()[0, 0, :, :], pred.numpy()[0, 0, :, :], multichannel=True)
+		loss = self.SSIM(target.numpy()[0, 0, :, :], pred.numpy()[0, 0, :, :], win_size=25)
 		return loss
 
 
