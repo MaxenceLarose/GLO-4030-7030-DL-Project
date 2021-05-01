@@ -9,6 +9,8 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.utils.data import DataLoader
+from .metrics import RMSELoss
+from sklearn.metrics import mean_squared_error
 
 
 def initialize_network_(network: nn.Module, initialization_function_: Callable, **func_kwargs):
@@ -61,6 +63,11 @@ class WeightedAverage(nn.Module):
 
         for idx, loss in enumerate(self.loss_rmse):
             self.weights[0, idx, 0, 0] = - loss/total_loss + 2/len(self.loss_rmse)
+
+        # -- Debug -- #
+        # self.weights[0, 0, 0, 0] = 1
+        # self.weights[0, 1, 0, 0] = 0
+        # self.weights[0, 2, 0, 0] = 0
 
     def forward(self, x):
         out = self.conv1(x)
@@ -209,7 +216,8 @@ class EnsembleVoting(object):
                     lr=training_kwargs.get("lr", 1e-3),
                     weight_decay=training_kwargs.get("weight_decay", 1e-2),
                 )
-                model = pt.Model(self.network, optimizer, 'MSELoss', batch_metrics=['accuracy'])
+
+                model = pt.Model(self.network, optimizer, RMSELoss())
                 if torch.cuda.is_available():
                     model.cuda()
 
@@ -238,13 +246,18 @@ class EnsembleVoting(object):
             save_path="model/ensemble_method_models_weights/"
     ) -> tuple:
         if self._method == self.available_methods[0]:
-            model = pt.Model(self.network, optimizer=None, loss_function='MSELoss', batch_metrics=["Accuracy"])
+            model = pt.Model(self.network, optimizer=None, loss_function=RMSELoss())
         else:
-            model = pt.Model(self.network, optimizer=None, loss_function='MSELoss', batch_metrics=["Accuracy"])
+            model = pt.Model(self.network, optimizer=None, loss_function=RMSELoss())
             model.load_weights(f"{save_path}/{self._method}.pt")
 
         logging.info(f"\nModel weights are \n{model.get_weights()}.\n")
 
         test_metrics = model.evaluate_generator(loaders["test"])
+
+        # -- Debug -- #
+        # test_metrics = model.evaluate_generator(loaders["test"], return_pred=True, return_ground_truth=True)
+        # print(np.sqrt(mean_squared_error(test_metrics[1][0][0, :, :], test_metrics[2][0][0, :, :])))
+        # test_metrics = test_metrics[0]
 
         return test_metrics
