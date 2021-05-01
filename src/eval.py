@@ -104,6 +104,7 @@ if __name__ == '__main__':
 		"SMP UnetPLusPLus",
 		"Pretrained Simple UNet",
 		"Pretrained RED_CNN",
+		"BreastUNet",
 		"BreastCNN"
 	]
 
@@ -111,8 +112,21 @@ if __name__ == '__main__':
 		"UNet",
 		"NestedUNet",
 		"InceptionUNet",
-		"Pretrained RED_CNN"
+		"Pretrained RED_CNN",
+		"BreastUNet"
 	]
+
+	# --------------------------------------------------------------------------------- #
+	#                            dataset                                                #
+	# --------------------------------------------------------------------------------- #
+	if eval_train_images:
+		train_images, _ = load_all_images(n_batch=n_data_batch, shuffle=False)
+		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=None)
+
+		if debug:
+			aapm_dataset = Subset(aapm_dataset, [0, 1])
+
+		test_loader = DataLoader(aapm_dataset, batch_size=batch_size, shuffle=False)
 
 	for network_to_use in networks_to_use:
 		if network_to_use not in available_networks:
@@ -133,11 +147,15 @@ if __name__ == '__main__':
 			preprocessing = None
 		elif network_to_use == "InceptionUNet":
 			nb_filter=(64, 128, 256, 512, 1024)
-			model = InceptionUNet(1, 1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,3,3,1], kernel_size_2=[3,3,3,3,1])
+			model = InceptionUNet(1, 1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,5,5,5], kernel_size_2=[3,3,3,3,3])
 			preprocessing = None
 		elif network_to_use == "BreastCNN":
-			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128])
+			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[64, 128, 256])
 			preprocessing = None
+		elif network_to_use == "BreastUNet":
+			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[64, 128, 256], unet_arch=True)
+			preprocessing = None
+			batch_size = 2
 		elif network_to_use == "SMP UnetPLusPLus":
 			encoder = "densenet121"
 			encoder_weights = "imagenet"
@@ -170,19 +188,6 @@ if __name__ == '__main__':
 		else:
 			warnings.warn("Something very wrong happened")
 		logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in model.parameters()])}")
-
-		# --------------------------------------------------------------------------------- #
-		#                            dataset                                                #
-		# --------------------------------------------------------------------------------- #
-		if eval_train_images:
-			train_images, _ = load_all_images(n_batch=n_data_batch)
-			aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)
-
-			if debug:
-				aapm_dataset = Subset(aapm_dataset, [0, 1])
-
-			test_loader = DataLoader(aapm_dataset, batch_size=batch_size, shuffle=False)
-
 		# --------------------------------------------------------------------------------- #
 		#                            network prediction                                     #
 		# --------------------------------------------------------------------------------- #

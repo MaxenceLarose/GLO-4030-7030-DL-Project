@@ -253,7 +253,7 @@ if __name__ == '__main__':
 	if load_data_for_challenge:
 		train_images, test_images = load_all_images(
 			image_types=["FBP", "Phantom", "Sinogram"], n_batch=4,
-			multiple_channels=False, load_sinograms=False, merge_datasets=False)
+			multiple_channels=False, load_sinograms=False, merge_datasets=False, shuffle=False)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
 		aapm_dataset = BreastCTDataset(
 			train_images["FBP"], train_images["PHANTOM"], preprocessing=preprocessing)

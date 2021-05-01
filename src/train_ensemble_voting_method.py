@@ -25,7 +25,7 @@ if __name__ == '__main__':
     #                            Constants                                              #
     # --------------------------------------------------------------------------------- #
     # training setup constants
-    lr = 0.01
+    lr = 0.001
     epochs = 20
     weight_decay = 1e-4
 
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     batch_size = 1
 
     # Models
-    models = ["InceptionUNet", "NestedUNet", "UNet"]
+    models = ["InceptionUNet", "NestedUNet", "UNet", "BreastUNet", "Pretrained RED_CNN"]
 
     # Methods
     available_methods = [
@@ -41,10 +41,10 @@ if __name__ == '__main__':
         "FCLayers",
         "CNN"
     ]
-    method = available_methods[0]
+    method = available_methods[2]
 
     # Number of networks in the ensemble
-    ensemble_size = 3
+    ensemble_size = 5
 
     # seed
     seed = 42
@@ -64,8 +64,8 @@ if __name__ == '__main__':
         method=method,
         input_shape=(ensemble_size, 512, 512),
         loss_rmse=models_loss,
-        kernel_size=1,
-        padding=0
+        kernel_size=3,
+        padding=1
     )
 
     # --------------------------------------------------------------------------------- #
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------- #
     history = ensemble_voting.train_network(
         loaders=loaders,
-        initialization="Constant",
+        initialization="Xavier_Normal",
         lr=lr,
         epochs=epochs,
         weight_decay=weight_decay

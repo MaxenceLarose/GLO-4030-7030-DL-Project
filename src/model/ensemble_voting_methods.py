@@ -11,6 +11,7 @@ import torch.nn.init as init
 from torch.utils.data import DataLoader
 from .metrics import RMSELoss
 from sklearn.metrics import mean_squared_error
+from .inceptionNet import InceptionBlock
 
 
 def initialize_network_(network: nn.Module, initialization_function_: Callable, **func_kwargs):
@@ -53,7 +54,7 @@ class WeightedAverage(nn.Module):
         self.conv1 = nn.Conv2d(input_shape[0], 1, kernel_size=1, padding=0)
 
         self.conv1.weight = torch.nn.Parameter(torch.tensor(self.weights, dtype=torch.float32), requires_grad=False)
-        self.conv1.bias.data = torch.tensor(np.array([0]))
+        self.conv1.bias.data = torch.tensor(np.array([0.0]), dtype=torch.float32)
         self.conv1.bias.requires_grad = False
 
         self.relu1 = nn.ReLU()
@@ -103,11 +104,13 @@ class CNNVote(nn.Module):
             padding: int = 0
     ):
         super().__init__()
-        self.conv1 = nn.Conv2d(input_shape[0], 1, kernel_size=kernel_size, padding=padding)
+        self.inceptionBlock = InceptionBlock(input_shape[0], 1, batch_norm_momentum=0.01)
+        self.conv1 = nn.Conv2d(4, 1, kernel_size=1, padding=0)
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        out = self.conv1(x)
+        out = self.inceptionBlock(x)
+        out = self.conv1(out)
         out = self.relu(out)
 
         return out

@@ -29,7 +29,7 @@ if __name__ == '__main__':
     batch_size = 1
 
     # Models
-    models = ["InceptionUNet", "NestedUNet", "UNet"]
+    models = ["InceptionUNet", "NestedUNet", "UNet", "BreastUNet", "Pretrained RED_CNN"]
 
     # Method
     available_methods = [
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     method = available_methods[0]
 
     # Number of networks in the ensemble
-    ensemble_size = 3
+    ensemble_size = 5
 
     # seed
     seed = 42
