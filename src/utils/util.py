@@ -159,7 +159,7 @@ def show_learning_curve(file_path: str, **kwargs) -> tuple:
     axes.xaxis.set_major_locator(MaxNLocator(integer=True))
     axes.tick_params(axis="both", which="major", labelsize=fontsize)
     axes.legend(fontsize=fontsize)
-    # axes.grid()
+    axes.grid()
 
     plt.tight_layout()
 

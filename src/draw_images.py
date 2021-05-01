@@ -17,6 +17,7 @@ import torch
 
 from sklearn.metrics import mean_squared_error
 from skimage.metrics import structural_similarity
+from utils.util import show_learning_curve
 
 from utils.util import get_phantom_from_diff
 
@@ -156,3 +157,13 @@ def draw_pixel_value_histogram(data : np.ndarray):
 	ax.set_xlim(min_val, max_val)
 	ax.set_yscale('log')
 	plt.show()
+
+
+if __name__ == "__main__":
+	show_learning_curve(
+		file_path="results/SMP/SMP_UNet_trained_from_scratch.log",
+		save=True,
+		markers="-",
+		save_name="results/SMP/SMP_UNet_trained_from_scratch.png",
+		show=True
+	)
