@@ -23,7 +23,7 @@ from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from data_loader.data_loaders import load_all_images, load_images
 from deeplib.training import HistoryCallback, get_model
-from model.metrics import validate_model, RMSELoss
+from model.metrics import validate_model, RMSELoss, PSNRLoss, SSIMLoss
 from data_loader.datasets import BreastCTDataset, train_valid_loaders
 from draw_images import draw_pred_target
 
@@ -45,6 +45,10 @@ def eval_model(
 		loss = nn.MSELoss()
 	elif criterion == "RMSELoss":
 		loss = RMSELoss()
+	elif criterion == "PSNRLoss":
+		loss = PSNRLoss()
+	elif criterion == "SSIMLoss":
+		loss = SSIMLoss()
 	else:
 		raise RuntimeError("{} criterion not available!".format(criterion))
 
