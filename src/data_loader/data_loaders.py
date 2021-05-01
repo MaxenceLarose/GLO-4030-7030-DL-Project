@@ -48,7 +48,8 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 	clip : bool=False,
 	load_sinograms=False,
 	multiple_channels=False,
-	merge_datasets=False) -> tuple:
+	merge_datasets=False,
+	shuffle=True) -> tuple:
 	"""
 	Read all the images located in the folder path.
 	The dtype are already encoded in float32.
@@ -123,20 +124,20 @@ def load_all_images(image_types : list=["Sinogram", "FBP", "Phantom"],
 	print(train_images.keys())
 	# shuffle
 	print(len(train_images["FBP"]))
-	idx_images_train = list(range(len(train_images["FBP"])))
-	np.random.shuffle(idx_images_train)
-	idx_images_test = list(range(len(test_images["FBP"])))
-	np.random.shuffle(idx_images_test)
-	if "DIFF" in train_images.keys():
-		train_images["DIFF"] = train_images["DIFF"][idx_images_train]
-		test_images["DIFF"] = test_images["DIFF"][idx_images_test]
+	if shuffle:
+		idx_images_train = list(range(len(train_images["FBP"])))
+		np.random.shuffle(idx_images_train)
+		idx_images_test = list(range(len(test_images["FBP"])))
+		np.random.shuffle(idx_images_test)
+		if "DIFF" in train_images.keys():
+			train_images["DIFF"] = train_images["DIFF"][idx_images_train]
+			test_images["DIFF"] = test_images["DIFF"][idx_images_test]
 
-	train_images["FBP"] = train_images["FBP"][idx_images_train]
-	train_images["PHANTOM"] = train_images["PHANTOM"][idx_images_train]
+		train_images["FBP"] = train_images["FBP"][idx_images_train]
+		train_images["PHANTOM"] = train_images["PHANTOM"][idx_images_train]
 
-	test_images["FBP"] = test_images["FBP"][idx_images_test]
-	test_images["PHANTOM"] = test_images["PHANTOM"][idx_images_test]
-	#print(idx_images_train)
+		test_images["FBP"] = test_images["FBP"][idx_images_test]
+		test_images["PHANTOM"] = test_images["PHANTOM"][idx_images_test]
 	return train_images, test_images
 
 
