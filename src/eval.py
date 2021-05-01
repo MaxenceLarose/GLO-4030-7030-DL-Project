@@ -181,7 +181,7 @@ if __name__ == '__main__':
 			if debug:
 				aapm_dataset = Subset(aapm_dataset, [0, 1])
 
-			test_loader = DataLoader(aapm_dataset, batch_size=batch_size, shuffle=True)
+			test_loader = DataLoader(aapm_dataset, batch_size=batch_size, shuffle=False)
 
 		# --------------------------------------------------------------------------------- #
 		#                            network prediction                                     #
