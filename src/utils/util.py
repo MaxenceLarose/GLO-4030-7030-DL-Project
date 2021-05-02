@@ -2,6 +2,9 @@
 import logging
 import glob
 import os
+from typing import List
+import ast
+import textwrap
 
 # Specialized python lib
 import albumentations as albu
@@ -96,3 +99,121 @@ def save_diff_dataset(path : str="data", n_batch=4):
         np.save(file, phantom - fbp)
         logging.info(f"Pĥantom and FBP difference for batch {batch} saved to file {file}")
 
+
+def read_log_file(file_path: str) -> dict:
+    """
+    Function used to read and parse the log file containing the history.
+
+    Args :
+        file_path: File path of the log file containing the history. (str)
+
+    Returns :
+        history: Dict of list containing the history of each parameter for each epoch. (dict)
+    """
+    with open(file_path, "r") as log_file:
+        lines: List[str] = log_file.readlines()
+
+        for line_idx, line in enumerate(lines):
+            if line.__contains__("defaultdict"):
+                first_index: int = line_idx
+
+        history_list: List[str] = lines[first_index + 1:]
+        history_str: str = textwrap.dedent(str().join(history_list))[:-2]
+        history_dict: dict = ast.literal_eval(history_str)
+
+    return history_dict
+
+
+def show_learning_curve(file_paths: List[str], model_names: List[str], **kwargs) -> tuple:
+    """
+    Function used to plot the learning curve.
+
+    Args :
+        file_path: File paths of the log files containing the history. (List[str])
+        model_names: Names of the different models. These names are the ones used in the figure. (List[str])
+        kwargs: {
+            save: True to save the current fig, else false. (bool)
+            save_name: The save name of the current fig. Default = "figures/model.png". (str)
+            show: True to show the current fig and clear the current buffer. Default = True. (bool)
+            markers: List of the marker styles used for train and validation markers. Default = ["o", "d"]. (list)
+            markersize: Marker size. Default = 4. (int)
+            font_size: Font size for labels and legend. Default = 16. (int)
+        }
+
+    Returns :
+        Fig and axes
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
+    from matplotlib.lines import Line2D
+    from matplotlib import colors as mcolors
+
+    available_markers = list(Line2D.markers.keys())[2:]
+    available_colors = list(dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS).keys())
+
+    total_files = len(file_paths)
+    # markers = available_markers[:2*total_files]
+    # markers_grouped = [markers[n:n + 2] for n in range(0, len(markers), 2)]
+
+    markers = kwargs.get("markers", ["o", "x"])
+    colors = available_colors[:total_files]
+
+    fig, axes = plt.subplots(1, 1, figsize=kwargs.get("figsize", (8, 6)))
+
+    for idx, (file_path, model_name, color) in enumerate(zip(file_paths, model_names, colors)):
+        history: dict = read_log_file(file_path=file_path)
+
+        epochs: list = history['epoch']
+
+        axes.plot(
+            epochs,
+            history['loss'],
+            marker=markers[0],
+            markersize=kwargs.get("markersize", 4),
+            linestyle='-',
+            lw=1,
+            label=f'{model_name}',
+            color=color
+        )
+
+        axes.plot(
+            epochs,
+            history['val_loss'],
+            marker=markers[1],
+            markersize=kwargs.get("markersize", 4),
+            linestyle='--',
+            lw=1,
+            label=f'{model_name}',
+            color=color
+        )
+
+    fontsize = kwargs.get("font_size", 14)
+    axes.set_ylabel('Loss [-]', fontsize=fontsize)
+    axes.set_xlabel('Epochs [-]', fontsize=fontsize)
+    axes.xaxis.set_major_locator(MaxNLocator(nbins=20, integer=True))
+    axes.set_yscale(kwargs.get("scale", "linear"))
+    axes.tick_params(axis="both", which="major", labelsize=fontsize)
+    axes.legend(fontsize=fontsize)
+    axes.grid()
+    plt.tight_layout()
+
+    if kwargs.get("save", True):
+        os.makedirs("figures/", exist_ok=True)
+        plt.savefig(kwargs.get("save_name", f"figures/model.png"), dpi=300)
+    if kwargs.get("show", True):
+        plt.show()
+
+    return fig, axes
+
+
+if __name__ == "__main__":
+    debug = True
+
+    if debug:
+        show_learning_curve(
+            file_paths=["train-1619896276266685.log"],
+            model_names=["debug"],
+            save=False,
+            save_name="figures/model.png",
+            show=True
+        )

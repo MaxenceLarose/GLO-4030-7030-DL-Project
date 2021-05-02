@@ -6,17 +6,41 @@ import pdb
 
 from poutyne import Model
 import torch.nn as nn
+from skimage.metrics import structural_similarity as ssim
+from skimage.metrics import peak_signal_noise_ratio as psnr
 
 
 # Classe de fonction de perte RMSE pour modele poutyne
 class RMSELoss(nn.Module):
-    def __init__(self, epsilon=1e-10):
-        super().__init__()
-        self.MSE = nn.MSELoss()
-        self.epsilon = epsilon
-    def forward(self, pred, target):
-        loss = torch.sqrt(self.MSE(pred, target) + self.epsilon)
-        return loss
+	def __init__(self, epsilon=1e-10):
+		super().__init__()
+		self.MSE = nn.MSELoss()
+		self.epsilon = epsilon
+
+	def forward(self, pred, target):
+		loss = torch.sqrt(self.MSE(pred, target) + self.epsilon)
+		return loss
+
+
+class PSNRLoss(nn.Module):
+	def __init__(self):
+		super().__init__()
+		self.PSNR = psnr
+
+	def forward(self, pred, target):
+		loss = self.PSNR(target.numpy()[0, 0, :, :], pred.numpy()[0, 0, :, :])
+		return loss
+
+
+class SSIMLoss(nn.Module):
+	def __init__(self):
+		super().__init__()
+		self.SSIM = ssim
+
+	def forward(self, pred, target):
+		loss = self.SSIM(target.numpy()[0, 0, :, :], pred.numpy()[0, 0, :, :], win_size=25)
+		return loss
+
 
 def contest_metric_evaluation(INPUT, OUT, evaluate_worst_RMSE=True):
 	# INPUT which has both ./ref and ./res - user submission

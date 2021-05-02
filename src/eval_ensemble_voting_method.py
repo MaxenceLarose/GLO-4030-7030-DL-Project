@@ -42,6 +42,8 @@ if __name__ == '__main__':
     # Number of networks in the ensemble
     ensemble_size = 5
 
+    criterion = "RMSELoss"
+
     # seed
     seed = 42
     set_seed(seed)
@@ -90,6 +92,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------- #
     test_acc = ensemble_voting.test_network(
         loaders=loaders,
+        criterion=criterion
     )
 
-    logging.info(f"Loss (RMSE): {test_acc}")
+    logging.info(f"Loss ({criterion}): {test_acc}")

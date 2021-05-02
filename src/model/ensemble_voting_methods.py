@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.utils.data import DataLoader
-from .metrics import RMSELoss
+from .metrics import RMSELoss, PSNRLoss, SSIMLoss
 from sklearn.metrics import mean_squared_error
 from .inceptionNet import InceptionBlock
 
@@ -246,12 +246,24 @@ class EnsembleVoting(object):
     def test_network(
             self,
             loaders: Dict[str, DataLoader],
+            criterion: str = "RMSELoss",
             save_path="model/ensemble_method_models_weights/"
     ) -> tuple:
-        if self._method == self.available_methods[0]:
-            model = pt.Model(self.network, optimizer=None, loss_function=RMSELoss())
+        if criterion == "MSELoss":
+            loss = nn.MSELoss()
+        elif criterion == "RMSELoss":
+            loss = RMSELoss()
+        elif criterion == "PSNRLoss":
+            loss = PSNRLoss()
+        elif criterion == "SSIMLoss":
+            loss = SSIMLoss()
         else:
-            model = pt.Model(self.network, optimizer=None, loss_function=RMSELoss())
+            raise RuntimeError("{} criterion not available!".format(criterion))
+
+        if self._method == self.available_methods[0]:
+            model = pt.Model(self.network, optimizer=None, loss_function=loss)
+        else:
+            model = pt.Model(self.network, optimizer=None, loss_function=loss)
             model.load_weights(f"{save_path}/{self._method}.pt")
 
         logging.info(f"\nModel weights are \n{model.get_weights()}.\n")
