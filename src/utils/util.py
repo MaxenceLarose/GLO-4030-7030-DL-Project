@@ -124,18 +124,20 @@ def read_log_file(file_path: str) -> dict:
     return history_dict
 
 
-def show_learning_curve(file_path: str, **kwargs) -> tuple:
+def show_learning_curve(file_paths: List[str], model_names: List[str], **kwargs) -> tuple:
     """
     Function used to plot the learning curve.
 
     Args :
-        file_path: File path of the log file containing the history. (str)
+        file_path: File paths of the log files containing the history. (List[str])
+        model_names: Names of the different models. These names are the ones used in the figure. (List[str])
         kwargs: {
-            save (bool): True to save the current fig, else false.
-            save_name (str): The save name of the current fig. Default = "figures/model.png"
-            show (bool): True to show the current fig and clear the current buffer. Default = True.
-            markers (str): Markers used for the figure. Default = 'o',
-            font_size (int): Font size for labels and legend. Default = 16.
+            save: True to save the current fig, else false. (bool)
+            save_name: The save name of the current fig. Default = "figures/model.png". (str)
+            show: True to show the current fig and clear the current buffer. Default = True. (bool)
+            markers: List of the marker styles used for train and validation markers. Default = ["o", "d"]. (list)
+            markersize: Marker size. Default = 4. (int)
+            font_size: Font size for labels and legend. Default = 16. (int)
         }
 
     Returns :
@@ -143,24 +145,56 @@ def show_learning_curve(file_path: str, **kwargs) -> tuple:
     """
     import matplotlib.pyplot as plt
     from matplotlib.ticker import MaxNLocator
+    from matplotlib.lines import Line2D
+    from matplotlib import colors as mcolors
 
-    history: dict = read_log_file(file_path=file_path)
+    available_markers = list(Line2D.markers.keys())[2:]
+    available_colors = list(dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS).keys())
 
-    epoch: int = len(history['loss'])
-    epochs: list = list(range(1, epoch + 1))
+    total_files = len(file_paths)
+    # markers = available_markers[:2*total_files]
+    # markers_grouped = [markers[n:n + 2] for n in range(0, len(markers), 2)]
+
+    markers = kwargs.get("markers", ["o", "x"])
+    colors = available_colors[:total_files]
 
     fig, axes = plt.subplots(1, 1, figsize=kwargs.get("figsize", (8, 6)))
 
+    for idx, (file_path, model_name, color) in enumerate(zip(file_paths, model_names, colors)):
+        history: dict = read_log_file(file_path=file_path)
+
+        epochs: list = history['epoch']
+
+        axes.plot(
+            epochs,
+            history['loss'],
+            marker=markers[0],
+            markersize=kwargs.get("markersize", 4),
+            linestyle='-',
+            lw=1,
+            label=f'{model_name} (Train)',
+            color=color
+        )
+
+        axes.plot(
+            epochs,
+            history['val_loss'],
+            marker=markers[1],
+            markersize=kwargs.get("markersize", 4),
+            linestyle='--',
+            lw=1,
+            label=f'{model_name} (Validation)',
+            color=color
+        )
+
     fontsize = kwargs.get("font_size", 14)
-    axes.plot(epochs, history['loss'], kwargs.get("markers", 'o'), label='Train')
-    axes.plot(epochs, history['val_loss'], kwargs.get("markers", 'o'), label='Validation')
     axes.set_ylabel('Loss [-]', fontsize=fontsize)
     axes.set_xlabel('Epochs [-]', fontsize=fontsize)
-    axes.xaxis.set_major_locator(MaxNLocator(integer=True))
+    axes.xaxis.set_major_locator(MaxNLocator(nbins=20, integer=True))
+    axes.set_yscale(kwargs.get("scale", "linear"))
     axes.tick_params(axis="both", which="major", labelsize=fontsize)
     axes.legend(fontsize=fontsize)
     axes.grid()
-
     plt.tight_layout()
 
     if kwargs.get("save", True):
@@ -177,9 +211,9 @@ if __name__ == "__main__":
 
     if debug:
         show_learning_curve(
-            file_path="train-1619896276266685.log",
+            file_paths=["train-1619896276266685.log"],
+            model_names=["debug"],
             save=False,
-            markers="-",
             save_name="figures/model.png",
             show=True
         )

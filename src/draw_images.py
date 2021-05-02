@@ -160,10 +160,16 @@ def draw_pixel_value_histogram(data : np.ndarray):
 
 
 if __name__ == "__main__":
+	models = dict(
+		SMP_UNet_Scrath="results/SMP/SMP_UNet_trained_from_scratch.log",
+		SMP_UNet_Freezed_Encoder="results/SMP/SMP_UNet_freezed_encoder.log",
+	)
+
 	show_learning_curve(
-		file_path="results/SMP/SMP_UNet_trained_from_scratch.log",
+		file_paths=list(models.values()),
+		model_names=list(models.keys()),
+		scale="log",
 		save=True,
-		markers="-",
-		save_name="results/SMP/SMP_UNet_trained_from_scratch.png",
+		save_name="results/learning_curves.png",
 		show=True
 	)
