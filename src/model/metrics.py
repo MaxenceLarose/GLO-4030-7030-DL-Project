@@ -120,12 +120,12 @@ def validate(network, valid_loader, criterion, use_gpu=True, save_data=False,
 	return validate_model(model, valid_loader, save_data=save_data, output_path=output_path,
 		pred_folder=pred_folder, target_folder=target_folder)
 
-def validate_model(model, valid_loader, save_data=False, output_path="data/model_trained_results",
+def validate_model(model, valid_loader, return_images=False, save_data=False, output_path="data/model_trained_results",
 		pred_folder="res", target_folder="ref", evaluate_worst_RMSE=True):
 	results = model.evaluate_generator(
 		valid_loader,
-		return_pred=save_data,
-		return_ground_truth=save_data,
+		return_pred=return_images,
+		return_ground_truth=return_images,
 		progress_options=dict(coloring=False))
 	print(len(results))
 	if save_data:
@@ -136,7 +136,7 @@ def validate_model(model, valid_loader, save_data=False, output_path="data/model
 		np.save(os.path.join(output_path, pred_folder, "predictions"), np.squeeze(results[1]))
 		np.save(os.path.join(output_path, target_folder, "targets"), np.squeeze(results[2]))
 		contest_metric_evaluation(output_path, output_path, evaluate_worst_RMSE=evaluate_worst_RMSE)
-	return results[0]
+	return results
 
 
 def validate_2(network, valid_loader, criterion, use_gpu=True, save_data=False, output_path="data/model_trained_results", pred_folder="res", target_folder="ref"):
