@@ -18,6 +18,7 @@ class UNetSMP(nn.Module):
                  unfreezed_layers: list,
                  in_channels: int,
                  encoder_depth: int = 5,
+                decoder_channels: tuple = (256, 128, 64, 32, 16),
                  encoder: str = "resnet34",
                  encoder_weights: str = "imagenet",
                  activation: str = "sigmoid",
@@ -28,6 +29,7 @@ class UNetSMP(nn.Module):
                               encoder_depth=encoder_depth,
                               encoder_weights=encoder_weights,
                               in_channels=in_channels,
+                              decoder_channels=decoder_channels,
                               activation=activation,
                               )
 
@@ -67,6 +69,7 @@ class UNetPlusPLus(nn.Module):
 
         # Freeze unwanted gradients
         for name, param in self.model.named_parameters():
+            #print(name)
             if any(layer in name for layer in unfreezed_layers):
                 pass
             else:
@@ -74,7 +77,6 @@ class UNetPlusPLus(nn.Module):
 
     def forward(self, x):
         x = self.model.forward(x)
-
         return x
 
 

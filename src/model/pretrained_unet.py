@@ -27,7 +27,8 @@ class PretrainedUNet(nn.Module):
 
         self.model = model
         self.n_channels = n_channels
-
+        #self.out_bn = nn.BatchNorm2d(1, momen)
+        self.relu = nn.ReLU(inplace=True)
         # Intial convolution to transform input image from 1 to 3 channels
         self.initial_conv = nn.Conv2d(self.n_channels, 3, kernel_size=1)
 
@@ -41,7 +42,7 @@ class PretrainedUNet(nn.Module):
     def forward(self, x):
         x = self.initial_conv(x)
         x = self.model.forward(x)
-
+        x = self.relu(x)
         return x
 
 

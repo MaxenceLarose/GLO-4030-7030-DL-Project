@@ -3,6 +3,7 @@ import time
 import os
 import warnings
 import numpy as np
+import pprint
 
 import matplotlib.pyplot as plt
 
@@ -81,7 +82,7 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	history_callback = HistoryCallback()
 	checkpoint_callback = ModelCheckpoint("{}_best.pt".format(save_path), save_best_only=True)
-	scheduler = ReduceLROnPlateau(patience=3, factor=0.5)
+	scheduler = ReduceLROnPlateau(patience=3, factor=0.3)
 	callbacks = [
 		history_callback, checkpoint_callback, scheduler] if callbacks is None else [
 		history_callback, checkpoint_callback, scheduler] + callbacks
@@ -154,7 +155,7 @@ if __name__ == '__main__':
 	load_network_state = False
 	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 150
+	n_epoch = 20
 	batch_size = 1
 	weight_decay = 1e-4
 	criterion = "RMSELoss"
@@ -181,27 +182,62 @@ if __name__ == '__main__':
 		"Pretrained Simple UNet",
 		"Pretrained RED_CNN",
 		"BreastUNet",
+		"Pretrained SMP UNet",
+		"SMP UNet",
 		"BreastCNN"
 	]
-	network_to_use: str = "InceptionUNet"
+	network_to_use: str = "BreastCNN"
 	if network_to_use not in available_networks:
 		raise NotImplementedError(
 			f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
 	elif network_to_use == "UNet":
-		nb_filter=(64, 128, 256, 512, 1024)
-		model = UNet(1, 1,
-					channels_depth_number=nb_filter,
-					use_relu=False,  # If False, then LeakyReLU
-					mode='nearest',  # For upsampling
-					residual_block=True,  # skip connections?
-					batch_norm_momentum=batch_norm_momentum)
+		model = UNet(1,1)
 		preprocessing = None
+	elif network_to_use == "Pretrained SMP UNet":
+		encoder = "resnet34"
+		encoder_weights = "imagenet"
+		encoder_depth = 5
+		decoder_channels = (512, 256, 128, 64, 32)
+		preprocessing = get_preprocessing(get_preprocessing_fn(
+			encoder_name=encoder, pretrained=encoder_weights))
+		if preprocessing:
+			in_channels = 3
+		else:
+			in_channels = 1
+		model = UNetSMP(
+			unfreezed_layers=["decoder", "segmentation_head"],
+			in_channels=in_channels,
+			encoder=encoder,
+			encoder_depth=encoder_depth,
+			decoder_channels=decoder_channels,
+			encoder_weights=encoder_weights,
+			activation=None
+		)
+	elif network_to_use == "SMP UNet":
+		encoder = "resnet34"
+		encoder_weights = None
+		encoder_depth = 5
+		decoder_channels = (512, 256, 128, 64, 32)
+		preprocessing = None
+		if preprocessing:
+			in_channels = 1
+		else:
+			in_channels = 1
+		model = UNetSMP(
+			unfreezed_layers=["encoder", "decoder", "segmentation_head"],
+			in_channels=in_channels,
+			encoder=encoder,
+			encoder_depth=encoder_depth,
+			decoder_channels=decoder_channels,
+			encoder_weights=encoder_weights,
+			activation=None
+		)
 	elif network_to_use == "NestedUNet":
-		nb_filter=(64, 128, 256, 512, 1024)
+		nb_filter=(32, 64, 128, 256, 512)
 		model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
 		preprocessing = None
 	elif network_to_use == "InceptionUNet":
-		nb_filter=(64, 128, 256, 512, 1024)
+		nb_filter=(32, 64, 128, 256, 512)
 		model = InceptionUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,5,5,5], kernel_size_2=[3,3,3,3,3])
 		preprocessing = None
 	elif network_to_use == "InceptionNet":
@@ -209,17 +245,17 @@ if __name__ == '__main__':
 			use_maxpool=True)
 		preprocessing = None
 	elif network_to_use == "BreastUNet":
-		model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[64, 128, 256], unet_arch=True)
+		model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=True)
 		preprocessing = None
 	elif network_to_use == "BreastCNN":
-		model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[64, 128, 256], unet_arch=False)
+		model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=False)
 		preprocessing = None
 	elif network_to_use == "SMP UnetPLusPLus":
-		encoder = "densenet121"
+		encoder = "resnet34"
 		encoder_weights = "imagenet"
 		activation = "logits"
 		encoder_depth = 5
-		decoder_channels = (1024, 512, 256, 128, 64)
+		decoder_channels = (512, 256, 128, 64, 32)
 		preprocessing = get_preprocessing(get_preprocessing_fn(
 			encoder_name=encoder, pretrained=encoder_weights))
 		if preprocessing:
@@ -227,7 +263,7 @@ if __name__ == '__main__':
 		else:
 			in_channels = 1
 		model = UNetPlusPLus(
-			unfreezed_layers=["encoder", "decoder"],
+			unfreezed_layers=["encoder", "decoder", "segmentation_head"],
 			in_channels=in_channels,
 			encoder=encoder,
 			encoder_depth=encoder_depth,
@@ -237,7 +273,7 @@ if __name__ == '__main__':
 		)
 	elif network_to_use == "Pretrained Simple UNet":
 		model = PretrainedUNet(
-			1, unfreezed_layers=["up1", "up2", "up3", "up4", "up5", "outc"]
+			1, unfreezed_layers=["inc", "down1", "down2", "down3", "down4", "down5", "up1", "up2", "up3", "up4", "up5", "outc"]
 		)
 		preprocessing = None
 	elif network_to_use == "Pretrained RED_CNN":
@@ -295,4 +331,5 @@ if __name__ == '__main__':
 	#                           network analysing                                       #
 	# --------------------------------------------------------------------------------- #
 	if not load_network_state:
+		logging.info(f"history: \n{pprint.pformat(history.history, indent=4)}")
 		history.display()

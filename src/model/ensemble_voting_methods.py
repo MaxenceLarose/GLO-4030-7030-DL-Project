@@ -224,7 +224,7 @@ class EnsembleVoting(object):
                 if torch.cuda.is_available():
                     model.cuda()
 
-                scheduler = pt.ReduceLROnPlateau(monitor='loss', mode="min", patience=3, factor=0.5, verbose=True)
+                scheduler = pt.ReduceLROnPlateau(monitor='val_loss', mode="min", patience=3, factor=0.5, verbose=True)
 
                 history = model.fit_generator(
                     loaders["train"],
