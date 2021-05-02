@@ -100,13 +100,13 @@ def save_diff_dataset(path : str="data", n_batch=4):
         logging.info(f"Pĥantom and FBP difference for batch {batch} saved to file {file}")
 
 
-def read_log_file(file_path: str) -> dict:
+def read_log_file(file_path: str, model_name: str) -> dict:
     """
     Function used to read and parse the log file containing the history.
 
     Args :
         file_path: File path of the log file containing the history. (str)
-
+        model_name: Name of the model. (str)
     Returns :
         history: Dict of list containing the history of each parameter for each epoch. (dict)
     """
@@ -116,6 +116,9 @@ def read_log_file(file_path: str) -> dict:
         for line_idx, line in enumerate(lines):
             if line.__contains__("defaultdict"):
                 first_index: int = line_idx
+            elif line.__contains__("Nombre de paramètres"):
+                logging.info(f"{model_name}")
+                logging.info(f"{line}")
 
         history_list: List[str] = lines[first_index + 1:]
         history_str: str = textwrap.dedent(str().join(history_list))[:-2]
@@ -135,7 +138,7 @@ def show_learning_curve(file_paths: List[str], model_names: List[str], **kwargs)
             save: True to save the current fig, else false. (bool)
             save_name: The save name of the current fig. Default = "figures/model.png". (str)
             show: True to show the current fig and clear the current buffer. Default = True. (bool)
-            markers: List of the marker styles used for train and validation markers. Default = ["o", "d"]. (list)
+            markers: List of the marker styles used for train and validation markers. (list)
             markersize: Marker size. Default = 4. (int)
             font_size: Font size for labels and legend. Default = 16. (int)
         }
@@ -152,23 +155,32 @@ def show_learning_curve(file_paths: List[str], model_names: List[str], **kwargs)
     available_colors = list(dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS).keys())
 
     total_files = len(file_paths)
-    # markers = available_markers[:2*total_files]
+    # print(available_markers)
+    # markers = available_markers[:total_files]
     # markers_grouped = [markers[n:n + 2] for n in range(0, len(markers), 2)]
 
-    markers = kwargs.get("markers", ["o", "x"])
+    markers = kwargs.get("markers", ["o", "v", "d", "x", "*", "+", "P", "s"])
+    markers = markers[:total_files]
+
+    if len(markers) != total_files:
+        raise ValueError(
+            f"Not enough values for markers. markers contains {len(markers)} elements while it is supposed to"
+            f"contains at least {total_files} elements."
+        )
+
     colors = available_colors[:total_files]
 
     fig, axes = plt.subplots(1, 1, figsize=kwargs.get("figsize", (8, 6)))
 
-    for idx, (file_path, model_name, color) in enumerate(zip(file_paths, model_names, colors)):
-        history: dict = read_log_file(file_path=file_path)
+    for idx, (file_path, model_name, marker, color) in enumerate(zip(file_paths, model_names, markers, colors)):
+        history: dict = read_log_file(file_path=file_path, model_name=model_name)
 
         epochs: list = history['epoch']
 
         axes.plot(
             epochs,
             history['loss'],
-            marker=markers[0],
+            marker=marker,
             markersize=kwargs.get("markersize", 4),
             linestyle='-',
             lw=1,
@@ -179,11 +191,10 @@ def show_learning_curve(file_paths: List[str], model_names: List[str], **kwargs)
         axes.plot(
             epochs,
             history['val_loss'],
-            marker=markers[1],
+            marker=marker,
             markersize=kwargs.get("markersize", 4),
             linestyle='--',
             lw=1,
-            label=f'{model_name}',
             color=color
         )
 

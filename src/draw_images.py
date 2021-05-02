@@ -18,7 +18,7 @@ import torch
 from sklearn.metrics import mean_squared_error
 from skimage.metrics import structural_similarity
 from utils.util import show_learning_curve
-
+from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
 from utils.util import get_phantom_from_diff
 
 
@@ -160,18 +160,42 @@ def draw_pixel_value_histogram(data : np.ndarray):
 
 
 if __name__ == "__main__":
-	models = {
+	# --------------------------------------------------------------------------------- #
+	#                            Logs Setup                                             #
+	# --------------------------------------------------------------------------------- #
+	logs_file_setup(__file__, logging.INFO)
+	log_device_setup()
+
+	# --------------------------------------------------------------------------------- #
+	#                             Figures                                               #
+	# --------------------------------------------------------------------------------- #
+	models_experimentation = {
+		"UNet Original": "results/UNet_Original/UNet_Original.log",
+		"UNet Original DIFF": "results/UNet_Original/UNet_Original_DIFF.log",
 		"SMP UNet Scratch": "results/SMP/SMP_UNet_trained_from_scratch.log",
 		"SMP UNet Freezed Encoder": "results/SMP/SMP_UNet_freezed_encoder.log",
-		"UNet Original": "results/UNet_Original/UNet_Original.log",
-		"UNet Original DIFF": "results/UNet_Original/UNet_Original_DIFF.log"
 	}
 
 	show_learning_curve(
-		file_paths=list(models.values()),
-		model_names=list(models.keys()),
+		file_paths=list(models_experimentation.values()),
+		model_names=list(models_experimentation.keys()),
 		scale="log",
 		save=True,
-		save_name="results/learning_curves.png",
+		save_name="results/learning_curves_experimentation.png",
+		show=True
+	)
+
+	models_UNet = {
+		"UNet Original": "results/UNet_Original/UNet_Original.log",
+		"Dense UNet": "results/NestedUNet/Dense_UNet.log",
+		"Breast UNet": "results/BreastUNet/BreastUNet.log"
+	}
+
+	show_learning_curve(
+		file_paths=list(models_UNet.values()),
+		model_names=list(models_UNet.keys()),
+		scale="log",
+		save=True,
+		save_name="results/learning_curves_UNet.png",
 		show=True
 	)
