@@ -29,7 +29,7 @@ if __name__ == '__main__':
     batch_size = 1
 
     # Models
-    models = ["InceptionUNet", "NestedUNet", "UNet", "BreastUNet", "Pretrained RED_CNN"]
+    models = ["BreastUNet", "InceptionUNet", "UNet", "NestedUNet"]
 
     # Method
     available_methods = [
@@ -37,10 +37,10 @@ if __name__ == '__main__':
         "FCLayers",
         "CNN"
     ]
-    method = available_methods[0]
+    method = available_methods[2]
 
     # Number of networks in the ensemble
-    ensemble_size = 5
+    ensemble_size = 4
 
     criterion = "RMSELoss"
 

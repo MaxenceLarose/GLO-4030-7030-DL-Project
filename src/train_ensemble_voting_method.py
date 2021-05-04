@@ -25,15 +25,15 @@ if __name__ == '__main__':
     #                            Constants                                              #
     # --------------------------------------------------------------------------------- #
     # training setup constants
-    lr = 0.001
-    epochs = 20
+    lr = 0.01
+    epochs = 100
     weight_decay = 1e-4
 
     # dataset constants
     batch_size = 1
 
     # Models
-    models = ["InceptionUNet", "NestedUNet", "UNet", "BreastUNet", "Pretrained RED_CNN"]
+    models = ["BreastUNet", "InceptionUNet", "UNet", "NestedUNet"]
 
     # Methods
     available_methods = [
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     method = available_methods[2]
 
     # Number of networks in the ensemble
-    ensemble_size = 5
+    ensemble_size = 4
 
     # seed
     seed = 42
@@ -86,12 +86,13 @@ if __name__ == '__main__':
         train_images["TARGETS"]
     )
 
-    train_loader, valid_loader = train_valid_loaders(train_valid_dataset, batch_size=batch_size)
+    train_loader, valid_loader = train_valid_loaders(train_valid_dataset, batch_size=batch_size, train_split=0.9)
     loaders = dict(train=train_loader, valid=valid_loader)
 
     # --------------------------------------------------------------------------------- #
     #                          Ensemble training                                        #
     # --------------------------------------------------------------------------------- #
+
     history = ensemble_voting.train_network(
         loaders=loaders,
         initialization="Xavier_Normal",

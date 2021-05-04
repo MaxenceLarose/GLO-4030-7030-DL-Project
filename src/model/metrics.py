@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import os
 import pdb
+import logging
 
 from poutyne import Model
 import torch.nn as nn
@@ -28,7 +29,7 @@ class PSNRLoss(nn.Module):
 		self.PSNR = psnr
 
 	def forward(self, pred, target):
-		loss = self.PSNR(target.numpy()[0, 0, :, :], pred.numpy()[0, 0, :, :])
+		loss = self.PSNR(target.numpy()[0, 0, :, :], pred.numpy()[0, 0, :, :], data_range=())
 		return loss
 
 
@@ -76,7 +77,9 @@ def contest_metric_evaluation(INPUT, OUT, evaluate_worst_RMSE=True):
 	num_pix = float(nx*ny)
 
 	meanrmse  = np.sqrt( ((diffsquared/num_pix).sum(axis=2)).sum(axis=1) ).mean()
-	print("The mean RMSE over %3i images is %8.6f "%(nim,meanrmse))
+	stdrmse = np.sqrt( ((diffsquared/num_pix).sum(axis=2)).sum(axis=1) ).std()
+	logging.info(f"RMSE : {meanrmse}")
+	logging.info(f"RMSE std : {stdrmse}\n")
 
 	# worst-case ROI RMSE computation
 	roisize = 25  #width and height of test ROI in pixels

@@ -104,15 +104,12 @@ class CNNVote(nn.Module):
             padding: int = 0
     ):
         super().__init__()
-        self.inceptionBlock = InceptionBlock(input_shape[0], 1, batch_norm_momentum=0.01)
-        self.conv1 = nn.Conv2d(4, 1, kernel_size=1, padding=0)
-        self.relu = nn.ReLU()
+        self.conv = nn.Conv2d(input_shape[0], 1, kernel_size=kernel_size, padding=padding)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
-        out = self.inceptionBlock(x)
-        out = self.conv1(out)
+        out = self.conv(x)
         out = self.relu(out)
-
         return out
 
 
@@ -207,7 +204,7 @@ class EnsembleVoting(object):
             params = init_funcs[training_kwargs.get("initialization", "Constant")]
             initialize_network_(self.network, params["func"], **params["func_kwargs"])
             params = [p for p in self.network.parameters() if p.requires_grad]
-
+            logging.info(f"\nNombre de paramètres: {np.sum([p.numel() for p in self.network.parameters()])}")
             if len(params) == 0:
                 exec_training = False
             else:
@@ -224,15 +221,14 @@ class EnsembleVoting(object):
                 if torch.cuda.is_available():
                     model.cuda()
 
-                scheduler = pt.ReduceLROnPlateau(monitor='val_loss', mode="min", patience=3, factor=0.5, verbose=True)
-
+                scheduler = pt.ReduceLROnPlateau(monitor='val_loss', mode="min", patience=3, factor=0.1, verbose=True)
+                checkpoint_callback = pt.ModelCheckpoint(f"{save_path}/{self._method}_best.pt", save_best_only=True)
                 history = model.fit_generator(
                     loaders["train"],
                     loaders["valid"],
                     epochs=training_kwargs.get("epochs", 5),
-                    callbacks=[scheduler],
+                    callbacks=[scheduler, checkpoint_callback],
                 )
-
                 logging.info(f"\nModel final weights are \n{model.get_weights()}.")
 
                 folder_path = os.path.join(os.getcwd(), save_path)

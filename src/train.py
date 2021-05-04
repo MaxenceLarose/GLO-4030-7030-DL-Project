@@ -126,14 +126,14 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	#                            save challenge images                                  #
 	# --------------------------------------------------------------------------------- #
-	if dataset_test_challenge is not None:
-		test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
-		validate_model(model, test_loader, save_data=True, output_path="data/challenge", evaluate_worst_RMSE=False)
+	#if dataset_test_challenge is not None:
+	#	test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
+		#validate_model(model, test_loader, save_data=True, output_path="data/challenge", evaluate_worst_RMSE=False)
 		#draw_all_preds_targets(network, test_loader, os.path.relpath("../Figure_challenge"))
 	# --------------------------------------------------------------------------------- #
 	#                            save validation images                                 #
 	# --------------------------------------------------------------------------------- #
-	validate_model(model, valid_loader, save_data=True, evaluate_worst_RMSE=False)
+	#validate_model(model, valid_loader, save_data=True, evaluate_worst_RMSE=False)
 	#draw_all_preds_targets(network, valid_loader)
 	return history_callback.history
 
@@ -155,7 +155,7 @@ if __name__ == '__main__':
 	load_network_state = False
 	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 20
+	n_epoch = 50
 	batch_size = 1
 	weight_decay = 1e-4
 	criterion = "RMSELoss"
@@ -186,7 +186,7 @@ if __name__ == '__main__':
 		"SMP UNet",
 		"BreastCNN"
 	]
-	network_to_use: str = "BreastCNN"
+	network_to_use: str = "BreastUNet"
 	if network_to_use not in available_networks:
 		raise NotImplementedError(
 			f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
@@ -288,7 +288,7 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	if load_data_for_challenge:
 		train_images, test_images = load_all_images(
-			image_types=["FBP", "Phantom", "Sinogram"], n_batch=4,
+			image_types=["FBP", "PHANTOM"], n_batch=4,
 			multiple_channels=False, load_sinograms=False, merge_datasets=False, shuffle=False)
 		valid_images_contest = load_images("FBP", path="data/validation", n_batch=1)
 		aapm_dataset = BreastCTDataset(

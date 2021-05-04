@@ -33,6 +33,7 @@ from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
 from sklearn.metrics import mean_squared_error
 from skimage.metrics import structural_similarity as ssim
 from skimage.metrics import peak_signal_noise_ratio as psnr
+from skimage.filters.rank import gradient
 
 def eval_model(
 		network,
@@ -42,7 +43,7 @@ def eval_model(
 		predicted_images_save_path,
 		batch_size=1,
 		use_gpu=True,
-		save_data=False,
+		save_data=True,
 		eval_all_criterion=True
 ):
 
@@ -79,35 +80,22 @@ def eval_model(
 	if eval_all_criterion:
 
 		loss_functions = dict(
-			MSELoss=mean_squared_error,
 			PSNRLoss=psnr,
-			SSIMLoss=ssim
 		)
 
 		for loss_name, loss_function in loss_functions.items():
-			# losses: list = []
-			# for target, prediction in zip(targets, predictions):
-			# 	losses.append(loss_function(target, prediction))
-
-			losses = loss_function(targets, predictions)
-
+			losses: list = []
+			for target, prediction in zip(targets, predictions):
+				if loss_name == "SSIMLoss":
+					losses.append(loss_function(target[0, :, :], prediction[0, :, :], win_size=25))
+				else:
+					losses.append(loss_function(target[0, :, :], prediction[0, :, :]))
+			#losses = loss_function(targets, predictions)
+			np.savetxt("{}/{}.txt".format(predicted_images_save_path, loss_name), losses)
 			mean_loss = np.mean(losses)
 			std = np.std(losses)
 			logging.info(f"{loss_name} : {mean_loss}")
 			logging.info(f"{loss_name} std : {std}\n")
-
-			if loss_name == "MSELoss":
-
-				# losses: list = []
-				# for target, prediction in zip(targets, predictions):
-				# 	losses.append(loss_function(target, prediction, squared=False))
-
-				losses = loss_function(targets, predictions, squared=False)
-
-				mean_loss = np.mean(losses)
-				std = np.std(losses)
-				logging.info(f"RMSELoss : {mean_loss}")
-				logging.info(f"RMSELoss std : {std}\n")
 
 
 if __name__ == '__main__':
@@ -120,14 +108,14 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
-	use_gpu = False
+	use_gpu = True
 	debug = True
 	batch_size = 1
 	criterion = "RMSELoss"
 	optimizer = "Adam"
 	eval_train_images = True
-	n_data_batch = 1
-	save_data = False
+	n_data_batch = 4
+	save_data = True
 
 	# unet setup constants
 	if batch_size == 1:
@@ -146,41 +134,55 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	available_networks = [
 		"UNet",
+		"UNet_50",
 		"NestedUNet",
 		"InceptionUNet",
+		"InceptionNet",
 		"SMP UnetPLusPLus",
 		"Pretrained Simple UNet",
 		"Pretrained RED_CNN",
 		"BreastUNet",
-		"BreastCNN"
+		"Pretrained SMP UNet",
+		"SMP UNet",
+		"BreastCNN",
+		"UNet_diff"
 	]
 
+	# networks_to_use: List[str] = [
+	# 	"SMP UNet",
+	# 	"UNet",
+	# 	"UNet_AUG",
+	# 	"NestedUNet",
+	# 	"BreastUNet"
+	# ]
 	networks_to_use: List[str] = [
-		"UNet",
-		"NestedUNet",
-		"InceptionUNet",
-		"Pretrained RED_CNN",
-		"BreastUNet"
+		"UNet_diff"
 	]
 
 	# --------------------------------------------------------------------------------- #
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
 	if eval_train_images:
-		train_images, _ = load_all_images(n_batch=n_data_batch, shuffle=False)
+		_, train_images = load_all_images(n_batch=n_data_batch, shuffle=False, image_types=["FBP", "DIFF", "Sinogram"], train_split=0.9)
 		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=None)
-
-		if debug:
-			aapm_dataset = Subset(aapm_dataset, [0, 1])
+		# if debug:
+		# 	aapm_dataset = Subset(aapm_dataset, [0, 1])
 
 		test_loader = DataLoader(aapm_dataset, batch_size=batch_size, shuffle=False)
 
 	for network_to_use in networks_to_use:
+		
 		if network_to_use not in available_networks:
 			raise NotImplementedError(
 				f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
 		elif network_to_use == "UNet":
-			model = UNet(1, 1)
+			model = UNet(1,1)
+			preprocessing = None
+		elif network_to_use == "UNet_50":
+			model = UNet(1,1)
+			preprocessing = None
+		elif network_to_use == "UNet_diff":
+			model = UNet(1,1)
 			preprocessing = None
 		elif network_to_use == "Pretrained SMP UNet":
 			encoder = "resnet34"
@@ -194,7 +196,7 @@ if __name__ == '__main__':
 			else:
 				in_channels = 1
 			model = UNetSMP(
-				unfreezed_layers=["decoder", "segmentation_head"],
+				unfreezed_layers=[],
 				in_channels=in_channels,
 				encoder=encoder,
 				encoder_depth=encoder_depth,
@@ -213,7 +215,7 @@ if __name__ == '__main__':
 			else:
 				in_channels = 1
 			model = UNetSMP(
-				unfreezed_layers=["encoder", "decoder", "segmentation_head"],
+				unfreezed_layers=[],
 				in_channels=in_channels,
 				encoder=encoder,
 				encoder_depth=encoder_depth,
@@ -222,25 +224,22 @@ if __name__ == '__main__':
 				activation=None
 			)
 		elif network_to_use == "NestedUNet":
-			nb_filter = (32, 64, 128, 256, 512)
-			model = NestedUNet(1, 1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
+			nb_filter=(32, 64, 128, 256, 512)
+			model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum)
 			preprocessing = None
 		elif network_to_use == "InceptionUNet":
-			nb_filter = (32, 64, 128, 256, 512)
-			model = InceptionUNet(1, 1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum,
-								  kernel_size_1=[5, 5, 5, 5, 5], kernel_size_2=[3, 3, 3, 3, 3])
+			nb_filter=(32, 64, 128, 256, 512)
+			model = InceptionUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,5,5,5], kernel_size_2=[3,3,3,3,3])
 			preprocessing = None
 		elif network_to_use == "InceptionNet":
 			model = InceptionNet(1, 1, 64, n_inception_blocks=5, batch_norm_momentum=batch_norm_momentum,
-								 use_maxpool=True)
+				use_maxpool=True)
 			preprocessing = None
 		elif network_to_use == "BreastUNet":
-			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128],
-							  unet_arch=True)
+			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=True)
 			preprocessing = None
 		elif network_to_use == "BreastCNN":
-			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128],
-							  unet_arch=False)
+			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=False)
 			preprocessing = None
 		elif network_to_use == "SMP UnetPLusPLus":
 			encoder = "resnet34"
@@ -265,9 +264,7 @@ if __name__ == '__main__':
 			)
 		elif network_to_use == "Pretrained Simple UNet":
 			model = PretrainedUNet(
-				1,
-				unfreezed_layers=["inc", "down1", "down2", "down3", "down4", "down5", "up1", "up2", "up3", "up4", "up5",
-								  "outc"]
+				1, unfreezed_layers=["inc", "down1", "down2", "down3", "down4", "down5", "up1", "up2", "up3", "up4", "up5", "outc"]
 			)
 			preprocessing = None
 		elif network_to_use == "Pretrained RED_CNN":
@@ -279,7 +276,7 @@ if __name__ == '__main__':
 		# --------------------------------------------------------------------------------- #
 		#                            network prediction                                     #
 		# --------------------------------------------------------------------------------- #
-		model_weigths_path = "model/models_weights/{}_weights_best.pt".format(network_to_use)
+		model_weigths_path = "model/models_weights_final/{}_weights_best.pt".format(network_to_use)
 		save_path_for_predictions = "results/{}/train_images_prediction".format(network_to_use)
 
 		logging.info(f"Begin validation of network {network_to_use}.")
@@ -300,23 +297,29 @@ if __name__ == '__main__':
 			targets_images = np.load(files_target)
 			predictions_images = np.load(files_predicts)
 
-			random_idx = np.random.randint(len(targets_images))
+			random_idx = 42
 			target_image = targets_images[random_idx]
 			pred_image = predictions_images[random_idx]
 
-			fig, ax = plt.subplots(1, 2, figsize=(12, 8))
+			fig, ax = plt.subplots()
 			size_split = 10
-			# target
-			im1 = ax[0].imshow(target_image, cmap='Greys')
-			divider1 = make_axes_locatable(ax[0])
+			# pred - target
+			diff = pred_image 
+			im1 = ax.imshow(diff, cmap='Greys', vmin=-0.001, vmax=0.001)
+			logging.info(f"The mean diff is {np.mean(diff)}.")
+			divider1 = make_axes_locatable(ax)
 			cax1 = divider1.append_axes("right", size="{}%".format(size_split), pad=0.05)
 			cbar1 = plt.colorbar(im1, cax=cax1)
-			ax[0].set_title("Target")
+			ax.set_xticks([])
+			ax.set_yticks([])
+			#ax.set_title("Target")
+			plt.savefig(os.path.join(save_path_for_predictions, "diff_{}.jpg".format(random_idx)))
+			plt.show()
 
 			# prediction
-			im2 = ax[1].imshow(pred_image, cmap='Greys')
-			divider2 = make_axes_locatable(ax[1])
-			cax2 = divider2.append_axes("right", size="{}%".format(size_split), pad=0.05)
-			cbar2 = plt.colorbar(im2, cax=cax2)
-			ax[1].set_title("Prediction")
-			plt.show()
+			# im2 = ax[1].imshow(pred_image, cmap='Greys')
+			# divider2 = make_axes_locatable(ax[1])
+			# cax2 = divider2.append_axes("right", size="{}%".format(size_split), pad=0.05)
+			# cbar2 = plt.colorbar(im2, cax=cax2)
+			# ax[1].set_title("Prediction")
+			# plt.show()

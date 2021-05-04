@@ -13,12 +13,13 @@ class ConvBlock1(nn.Module):
 
 	def forward(self, x, x_other=None):
 		x = self.conv1(x)
-		x = self.bn1(x)
-		x1 = self.relu(x)
-		x2 = self.conv2(x1)
-		x2 = self.bn2(x2)
-		x2 = self.relu(x2)
-		out = x1 + x2
+		x1 = self.bn1(x)
+		x1 = self.relu(x1)
+		x1 = self.conv2(x1)
+		x1 = self.bn2(x1)
+		x1 += x
+		out = self.relu(x1)
+		#out = x1 + x2
 		return out
 
 class ConvBlock2(nn.Module):
@@ -39,16 +40,17 @@ class ConvBlock2(nn.Module):
 
 	def forward(self, x):
 		tmp = x.clone()
+		tmp = self.conv3(tmp)
+		tmp = self.bn3(tmp)
+		#tmp = self.relu(tmp)
 		x = self.conv1(x)
 		x = self.bn1(x)
 		x = self.relu(x)
 		x = self.conv2(x)
 		x = self.bn2(x)
-		x = self.relu(x)
-		tmp = self.conv3(tmp)
-		tmp = self.bn3(tmp)
-		tmp = self.relu(tmp)
-		out = x + tmp
+		x += tmp
+		out = self.relu(x)
+		#out = x + tmp
 		return out
 
 
