@@ -183,7 +183,7 @@ def show_learning_curve(file_paths: List[str], model_names: List[str], **kwargs)
             marker=marker,
             markersize=kwargs.get("markersize", 4),
             linestyle='-',
-            lw=1,
+            lw=1.8,
             label=f'{model_name}',
             color=color
         )
@@ -194,7 +194,7 @@ def show_learning_curve(file_paths: List[str], model_names: List[str], **kwargs)
             marker=marker,
             markersize=kwargs.get("markersize", 4),
             linestyle='--',
-            lw=1,
+            lw=1.8,
             color=color
         )
 
