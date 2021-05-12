@@ -170,10 +170,11 @@ if __name__ == "__main__":
 	#                             Figures                                               #
 	# --------------------------------------------------------------------------------- #
 	models_experimentation = {
-		"UNet Original": "results/UNet_Original/UNet_Original.log",
-		"UNet Original DIFF": "results/UNet_Original/UNet_Original_DIFF.log",
-		"SMP UNet Scratch": "results/SMP/SMP_UNet_trained_from_scratch.log",
-		"SMP UNet Freezed Encoder": "results/SMP/SMP_UNet_freezed_encoder.log",
+		"Pretrained SMP U-Net": "results/SMP/SMP_UNet_freezed_encoder.log",
+		"SMP U-Net": "results/SMP/SMP_UNet_trained_from_scratch.log",
+		"U-Net Original": "results/UNet_Original/UNet_Original.log",
+		"U-Net DIFF": "results/UNet_Original/UNet_Original_DIFF.log",
+		"U-Net AUG": "results/UNet_Original/UNet_Original_AUG.log"
 	}
 
 	show_learning_curve(
@@ -182,13 +183,17 @@ if __name__ == "__main__":
 		scale="log",
 		save=True,
 		save_name="results/learning_curves_experimentation.png",
+		font_size=18,
+		markersize=6,
 		show=True
 	)
 
 	models_UNet = {
-		"UNet Original": "results/UNet_Original/UNet_Original.log",
-		"Dense UNet": "results/NestedUNet/Dense_UNet.log",
-		"Breast UNet": "results/BreastUNet/BreastUNet.log"
+		"U-Net Original": "results/UNet_Original/UNet_Original.log",
+		"Dense U-Net": "results/NestedUNet/Dense_UNet.log",
+		"Breast U-Netv1": "results/BreastUNet/BreastUNetv1.log",
+		"Breast U-Netv2": "results/BreastUNet/BreastUNetv2.log",
+		"Inception U-Net": "results/InceptionUNet/InceptionUNet.log"
 	}
 
 	show_learning_curve(
@@ -197,5 +202,22 @@ if __name__ == "__main__":
 		scale="log",
 		save=True,
 		save_name="results/learning_curves_UNet.png",
+		font_size=18,
+		markersize=6,
+		show=True
+	)
+
+	UNet = {
+		"U-Net Original": "results/UNet_Original/UNet_50_epochs.log",
+	}
+
+	show_learning_curve(
+		file_paths=list(UNet.values()),
+		model_names=list(UNet.keys()),
+		scale="log",
+		save=True,
+		save_name="results/learning_curves_UNet_50_epochs.png",
+		font_size=18,
+		markersize=6,
 		show=True
 	)
