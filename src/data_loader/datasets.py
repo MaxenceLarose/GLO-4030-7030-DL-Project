@@ -35,8 +35,7 @@ class BreastCTDataset(Dataset):
     def to_numpy(self):
         return self.data.numpy(), self.targets.numpy()
 
-
-def train_valid_loaders(dataset, batch_size, train_split=0.8, shuffle=True, seed=42, valid_dataset=None):
+def train_valid_loaders(dataset, batch_size, train_split=0.8, shuffle=True, seed=42):
     """
     Divise un jeu de données en ensemble d'entraînement et de validation et retourne pour chacun un DataLoader PyTorch.
 
@@ -58,8 +57,8 @@ def train_valid_loaders(dataset, batch_size, train_split=0.8, shuffle=True, seed
         np.random.seed(seed)
         np.random.shuffle(indices)
 
-    split = math.floor(train_split * num_data)
-    if valid_dataset is None:
+    if train_split < 1 and train_split >= 0:
+        split = math.floor(train_split * num_data)
         train_idx, valid_idx = indices[:split], indices[split:]
 
         train_dataset = Subset(dataset, train_idx)
@@ -67,8 +66,11 @@ def train_valid_loaders(dataset, batch_size, train_split=0.8, shuffle=True, seed
 
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
-    else:
+    elif train_split == 1:
+        dataset = Subset(dataset, indices)
         train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
-
+        valid_loader = None
+    else:
+        raise RuntimeError("train_valid_loaders wrong train split input. \
+            Excpected value between 0 and 1 but got {} instead".format(train_split))
     return train_loader, valid_loader
