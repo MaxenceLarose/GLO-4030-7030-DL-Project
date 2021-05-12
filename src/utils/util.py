@@ -217,6 +217,196 @@ def show_learning_curve(file_paths: List[str], model_names: List[str], **kwargs)
     return fig, axes
 
 
+def show_learning_curve_v2(file_paths: List[str], model_names: List[str], **kwargs) -> tuple:
+    """
+    Function used to plot the learning curve.
+
+    Args :
+        file_path: File paths of the log files containing the history. (List[str])
+        model_names: Names of the different models. These names are the ones used in the figure. (List[str])
+        kwargs: {
+            save: True to save the current fig, else false. (bool)
+            save_name: The save name of the current fig. Default = "figures/model.png". (str)
+            show: True to show the current fig and clear the current buffer. Default = True. (bool)
+            markers: List of the marker styles used for train and validation markers. (list)
+            markersize: Marker size. Default = 4. (int)
+            font_size: Font size for labels and legend. Default = 16. (int)
+        }
+
+    Returns :
+        Fig and axes
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
+    from matplotlib.lines import Line2D
+    from matplotlib import colors as mcolors
+
+    available_markers = list(Line2D.markers.keys())[2:]
+    available_colors = list(dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS).keys())
+
+    total_files = len(file_paths)
+    # print(available_markers)
+    # markers = available_markers[:total_files]
+    # markers_grouped = [markers[n:n + 2] for n in range(0, len(markers), 2)]
+
+    markers = kwargs.get("markers", ["o", "v", "d", "x", "*", "+", "P", "s"])
+    markers = markers[:total_files]
+
+    if len(markers) != total_files:
+        raise ValueError(
+            f"Not enough values for markers. markers contains {len(markers)} elements while it is supposed to"
+            f"contains at least {total_files} elements."
+        )
+
+    colors = available_colors[:total_files]
+
+    fig, axes = plt.subplots(1, 1, figsize=kwargs.get("figsize", (8, 6)))
+
+    for idx, (file_path, model_name, marker, color) in enumerate(zip(file_paths, model_names, markers, colors)):
+        with open(file_path, "r") as log_file:
+            lines: List[str] = log_file.readlines()
+
+            for line_idx, line in enumerate(lines):
+                if line.__contains__("epoch"):
+                    first_index: int = line_idx - 1
+                    break
+
+        epochs: np.ndarray = np.loadtxt(file_path, usecols=1, skiprows=first_index)
+        loss: np.ndarray = np.loadtxt(file_path, usecols=3, skiprows=first_index)
+        val_loss: np.ndarray = np.loadtxt(file_path, usecols=5, skiprows=first_index)
+
+        axes.plot(
+            epochs,
+            loss,
+            # marker=marker,
+            # markersize=kwargs.get("markersize", 4),
+            linestyle='-',
+            lw=1.8,
+            label=f'{model_name}',
+            color=color
+        )
+
+        axes.plot(
+            epochs,
+            val_loss,
+            # marker=marker,
+            # markersize=kwargs.get("markersize", 4),
+            linestyle='--',
+            lw=1.8,
+            color=color
+        )
+
+    fontsize = kwargs.get("font_size", 14)
+    axes.set_ylabel('Loss RMSE [-]', fontsize=fontsize)
+    axes.set_xlabel('Epochs [-]', fontsize=fontsize)
+    axes.xaxis.set_major_locator(MaxNLocator(nbins=10, integer=True))
+    axes.set_xscale(kwargs.get("scale", "linear"))
+    axes.set_yscale(kwargs.get("scale", "linear"))
+    axes.tick_params(axis="both", which="major", labelsize=fontsize)
+    axes.legend(fontsize=fontsize)
+    axes.grid()
+
+    axes.axhline(y=0.00022, xmin=0.0001, xmax=1, lw=2, color="k")
+    axes.annotate(s=r"deepx score ($2.2 \times 10^{-4}$)", xy=(1, 0.00023), fontsize=16)
+
+    plt.tight_layout()
+
+    if kwargs.get("save", True):
+        os.makedirs("figures/", exist_ok=True)
+        plt.savefig(kwargs.get("save_name", f"figures/model.png"), dpi=300)
+    if kwargs.get("show", True):
+        plt.show()
+
+    return fig, axes
+
+
+def show_learning_rate(file_paths: List[str], model_names: List[str], **kwargs) -> tuple:
+    """
+    Function used to plot the learning curve.
+
+    Args :
+        file_path: File paths of the log files containing the history. (List[str])
+        model_names: Names of the different models. These names are the ones used in the figure. (List[str])
+        kwargs: {
+            save: True to save the current fig, else false. (bool)
+            save_name: The save name of the current fig. Default = "figures/model.png". (str)
+            show: True to show the current fig and clear the current buffer. Default = True. (bool)
+            markers: List of the marker styles used for train and validation markers. (list)
+            markersize: Marker size. Default = 4. (int)
+            font_size: Font size for labels and legend. Default = 16. (int)
+        }
+
+    Returns :
+        Fig and axes
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
+    from matplotlib.lines import Line2D
+    from matplotlib import colors as mcolors
+
+    available_markers = list(Line2D.markers.keys())[2:]
+    available_colors = list(dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS).keys())
+
+    total_files = len(file_paths)
+    # print(available_markers)
+    # markers = available_markers[:total_files]
+    # markers_grouped = [markers[n:n + 2] for n in range(0, len(markers), 2)]
+
+    markers = kwargs.get("markers", ["o", "v", "d", "x", "*", "+", "P", "s"])
+    markers = markers[:total_files]
+
+    if len(markers) != total_files:
+        raise ValueError(
+            f"Not enough values for markers. markers contains {len(markers)} elements while it is supposed to"
+            f"contains at least {total_files} elements."
+        )
+
+    colors = available_colors[:total_files]
+
+    fig, axes = plt.subplots(1, 1, figsize=kwargs.get("figsize", (8, 6)))
+
+    for idx, (file_path, model_name, marker, color) in enumerate(zip(file_paths, model_names, markers, colors)):
+        with open(file_path, "r") as log_file:
+            lines: List[str] = log_file.readlines()
+
+            for line_idx, line in enumerate(lines):
+                if line.__contains__("epoch"):
+                    first_index: int = line_idx - 1
+                    break
+
+        epochs: np.ndarray = np.loadtxt(file_path, usecols=1, skiprows=first_index)
+        lr: np.ndarray = np.loadtxt(file_path, usecols=7, skiprows=first_index)
+
+        axes.plot(
+            epochs,
+            lr,
+            # marker=marker,
+            # markersize=kwargs.get("markersize", 4),
+            linestyle='-',
+            lw=1.8,
+            label=f'{model_name}',
+            color=color
+        )
+
+    fontsize = kwargs.get("font_size", 14)
+    axes.set_ylabel('Learning rate [-]', fontsize=fontsize)
+    axes.set_xlabel('Epochs [-]', fontsize=fontsize)
+    axes.xaxis.set_major_locator(MaxNLocator(nbins=10, integer=True))
+    axes.set_yscale(kwargs.get("scale", "linear"))
+    axes.tick_params(axis="both", which="major", labelsize=fontsize)
+    axes.legend(fontsize=fontsize)
+    axes.grid()
+    plt.tight_layout()
+
+    if kwargs.get("save", True):
+        os.makedirs("figures/", exist_ok=True)
+        plt.savefig(kwargs.get("save_name", f"figures/model.png"), dpi=300)
+    if kwargs.get("show", True):
+        plt.show()
+
+    return fig, axes
+
+
 if __name__ == "__main__":
     debug = True
 

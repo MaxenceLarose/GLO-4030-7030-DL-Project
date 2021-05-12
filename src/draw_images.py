@@ -17,7 +17,7 @@ import torch
 
 from sklearn.metrics import mean_squared_error
 from skimage.metrics import structural_similarity
-from utils.util import show_learning_curve
+from utils.util import show_learning_curve, show_learning_curve_v2, show_learning_rate
 from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
 from utils.util import get_phantom_from_diff
 
@@ -217,6 +217,35 @@ if __name__ == "__main__":
 		scale="log",
 		save=True,
 		save_name="results/learning_curves_UNet_50_epochs.png",
+		font_size=18,
+		markersize=6,
+		show=True
+	)
+
+	Nets = {
+		"BreastUNet_BN_BS4_3600": "results/BreastUNet/BreastUNet_BN_BS4_3600.log",
+		"BreastUNet_BN_BS4_11600": "results/BreastUNet/BreastUNet_BN_BS4_11600.log",
+		"NestedUNet_BN_BS4_3600": "results/NestedUNet/NestedUNet_BN_BS4_3600.log",
+		"UNet_AUG_6600": "results/UNet_Original/UNet_AUG_6600.log"
+	}
+
+	show_learning_curve_v2(
+		file_paths=list(Nets.values()),
+		model_names=list(Nets.keys()),
+		scale="log",
+		save=True,
+		save_name="results/learning_curves.png",
+		font_size=18,
+		markersize=6,
+		show=True
+	)
+
+	show_learning_rate(
+		file_paths=list(Nets.values()),
+		model_names=list(Nets.keys()),
+		scale="log",
+		save=True,
+		save_name="results/learning_rate.png",
 		font_size=18,
 		markersize=6,
 		show=True

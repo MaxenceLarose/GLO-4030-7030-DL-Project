@@ -5,6 +5,7 @@ import gzip
 import matplotlib.pyplot as plt
 from typing import Tuple
 
+import random
 import numpy as np
 import albumentations as A
 from torchvision.transforms import ToTensor, Compose, RandomRotation
@@ -54,7 +55,10 @@ class PairwiseRandomRotation(RandomRotation):
             else:
                 fill = [float(f) for f in fill]
 
-        angle = self.get_params(self.degrees)
+        # angle = self.get_params(self.degrees)
+        angles = [90.0, 180.0, 270.0]
+
+        angle = random.choice(angles)
 
         img = F.rotate(img, angle, self.resample, self.expand, self.center)
         mask = F.rotate(mask, angle, self.resample, self.expand, self.center)
@@ -73,6 +77,9 @@ def get_transformed_image_and_target(
     ])
 
     transformed_image, transformed_mask = transform(input=[torch.from_numpy(image), torch.from_numpy(mask)])
+    logging.info(f"Mean for this batch : {np.mean(transformed_image.numpy())}.")
+    logging.info(f"Max pixel in this batch : {np.max(transformed_image.numpy())}.")
+
     if show:
         image_idx = 71
 
