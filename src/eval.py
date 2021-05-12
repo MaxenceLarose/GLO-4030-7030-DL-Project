@@ -134,7 +134,6 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	available_networks = [
 		"UNet",
-		"UNet_50",
 		"NestedUNet",
 		"InceptionUNet",
 		"InceptionNet",
@@ -145,7 +144,6 @@ if __name__ == '__main__':
 		"Pretrained SMP UNet",
 		"SMP UNet",
 		"BreastCNN",
-		"UNet_diff"
 	]
 
 	# networks_to_use: List[str] = [
@@ -171,17 +169,10 @@ if __name__ == '__main__':
 		test_loader = DataLoader(aapm_dataset, batch_size=batch_size, shuffle=False)
 
 	for network_to_use in networks_to_use:
-		
 		if network_to_use not in available_networks:
 			raise NotImplementedError(
 				f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
 		elif network_to_use == "UNet":
-			model = UNet(1,1)
-			preprocessing = None
-		elif network_to_use == "UNet_50":
-			model = UNet(1,1)
-			preprocessing = None
-		elif network_to_use == "UNet_diff":
 			model = UNet(1,1)
 			preprocessing = None
 		elif network_to_use == "Pretrained SMP UNet":
