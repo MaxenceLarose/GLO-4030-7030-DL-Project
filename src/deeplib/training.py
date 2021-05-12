@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToTensor
+import logging
+import pprint
 
 import poutyne as pt
 
@@ -112,8 +114,11 @@ class HistoryCallback(pt.Callback):
 
     def on_epoch_end(self, epoch_number, logs):
         self.history.save(dict(**logs, lr=self.model.optimizer.param_groups[0]['lr']))
-        print("lr=", self.model.optimizer.param_groups[0]['lr'])
-
+        logging.info(f"epoch: {pprint.pformat(epoch_number)}\
+            loss: {pprint.pformat(self.history.history['loss'][epoch_number - 1])}\
+            val_loss: {pprint.pformat(self.history.history['val_loss'][epoch_number - 1])}\
+            lr: {pprint.pformat(self.history.history['lr'][epoch_number - 1])}\
+            time: {pprint.pformat(self.history.history['time'][epoch_number - 1])}")
 
 def train(network, optimizer, dataset, n_epoch, batch_size, *, use_gpu=True, criterion=None, callbacks=None):
     """
