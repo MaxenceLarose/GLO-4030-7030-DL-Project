@@ -19,16 +19,25 @@ import torch.nn.functional as F
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
-    def __init__(self, in_channels, out_channels, mid_channels=None):
+    def __init__(self, in_channels, out_channels, mid_channels=None, norm="BN", num_groups=4, norm_momentum=0.1):
         super().__init__()
         if not mid_channels:
             mid_channels = out_channels
+        if norm == "BN":
+            self.bn1 = nn.BatchNorm2d(mid_channels, momentum=norm_momentum)
+            self.bn2 = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
+        elif norm == "GN" and num_groups != 0:
+            print("Using group norm!")
+            self.bn1 = nn.GroupNorm(num_groups, mid_channels)
+            self.bn2 = nn.GroupNorm(num_groups, out_channels)
+        else:
+            raise RuntimeError("wrong norm option: {}".format(norm))
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(mid_channels),
+            self.bn1,
             nn.ReLU(inplace=True),
             nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
+            self.bn2,
             nn.ReLU(inplace=True)
         )
 
@@ -39,11 +48,11 @@ class DoubleConv(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, norm="BN", num_groups=4):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
+            DoubleConv(in_channels, out_channels, norm=norm)
         )
 
     def forward(self, x):
@@ -53,16 +62,16 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(self, in_channels, out_channels, bilinear=True):
+    def __init__(self, in_channels, out_channels, bilinear=True, norm="BN", num_groups=4):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
+            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2, norm=norm, num_groups=num_groups)
         else:
             self.up = nn.ConvTranspose2d(in_channels , in_channels // 2, kernel_size=2, stride=2)
-            self.conv = DoubleConv(in_channels, out_channels)
+            self.conv = DoubleConv(in_channels, out_channels, norm=norm, num_groups=num_groups)
 
 
     def forward(self, x1, x2):
@@ -96,22 +105,22 @@ class OutConv(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, n_channels, n_classes, filters=[32, 64, 128, 256, 512], bilinear=True, out_relu=False):
+    def __init__(self, n_channels, n_classes, filters=[32, 64, 128, 256, 512], bilinear=True, out_relu=False, norm="BN", num_groups=4):
         super(UNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.bilinear = bilinear
 
-        self.inc = DoubleConv(n_channels, filters[0])
-        self.down1 = Down(filters[0], filters[1])
-        self.down2 = Down(filters[1], filters[2])
-        self.down3 = Down(filters[2], filters[3])
+        self.inc = DoubleConv(n_channels, filters[0], norm=norm, num_groups=num_groups)
+        self.down1 = Down(filters[0], filters[1], norm=norm, num_groups=num_groups)
+        self.down2 = Down(filters[1], filters[2], norm=norm, num_groups=num_groups)
+        self.down3 = Down(filters[2], filters[3], norm=norm, num_groups=num_groups)
         factor = 2 if bilinear else 1
-        self.down4 = Down(filters[3], filters[4] // factor)
-        self.up1 = Up(filters[4], filters[3] // factor, bilinear)
-        self.up2 = Up(filters[3], filters[2] // factor, bilinear)
-        self.up3 = Up(filters[2], filters[1] // factor, bilinear)
-        self.up4 = Up(filters[1], filters[0], bilinear)
+        self.down4 = Down(filters[3], filters[4] // factor, norm=norm, num_groups=num_groups)
+        self.up1 = Up(filters[4], filters[3] // factor, bilinear, norm=norm, num_groups=num_groups)
+        self.up2 = Up(filters[3], filters[2] // factor, bilinear, norm=norm, num_groups=num_groups)
+        self.up3 = Up(filters[2], filters[1] // factor, bilinear, norm=norm, num_groups=num_groups)
+        self.up4 = Up(filters[1], filters[0], bilinear, norm=norm, num_groups=num_groups)
         self.outc = OutConv(filters[0], n_classes, out_relu=out_relu)
 
     def forward(self, x):

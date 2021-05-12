@@ -3,43 +3,69 @@ from torch import nn
 
 
 class ConvBlock1(nn.Module):
-	def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, batch_norm_momentum=0.1):
+	def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, norm_momentum=0.1, norm="BN", num_groups=4):
 		super().__init__()
 		self.relu = nn.LeakyReLU(inplace=True)
 		self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=1)
-		self.bn1 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
+		if norm == "BN":
+			self.bn1 = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
+		elif norm == "GN" and num_groups != 0:
+			self.bn1 = nn.GroupNorm(num_groups, out_channels)
+		else:
+			raise RuntimeError("wrong norm option: {}".format(norm))
 		self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=1)
-		self.bn2 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
+		if norm == "BN":
+			self.bn2 = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
+		elif norm == "GN" and num_groups != 0:
+			self.bn2 = nn.GroupNorm(num_groups, out_channels)
+		else:
+			raise RuntimeError("wrong norm option: {}".format(norm))
 
-	def forward(self, x, x_other=None):
+	def forward(self, x):
 		x = self.conv1(x)
 		x1 = self.bn1(x)
 		x1 = self.relu(x1)
 		x1 = self.conv2(x1)
-		x1 = self.bn2(x1)
 		x1 += x
+		x1 = self.bn2(x1)
 		out = self.relu(x1)
 		#out = x1 + x2
 		return out
 
 class ConvBlock2(nn.Module):
-	def __init__(self, in_channels, out_channels, kernel_size_1=3, kernel_size_2=1, batch_norm_momentum=0.1):
+	def __init__(self, in_channels, out_channels, kernel_size=3, norm_momentum=0.1, norm="BN", num_groups=4):
 		super().__init__()
 		self.relu = nn.LeakyReLU(inplace=True)
-		if kernel_size_2 == 3:
+		if kernel_size == 3:
 			padding = 1
+		elif kernel_size == 5:
+			padding = 2
 		else:
 			padding = 0
-		self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size_1, stride=2, padding=1)
-		self.bn1 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
-		self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size_1, stride=1, padding=1)
-		self.bn2 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
-		self.conv3 = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size_2, stride=2, padding=padding)
-		self.bn3 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
-
+		self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=2, padding=padding)
+		if norm == "BN":
+			self.bn1 = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
+		elif norm == "GN" and num_groups != 0:
+			self.bn1 = nn.GroupNorm(num_groups, out_channels)
+		else:
+			raise RuntimeError("wrong norm option: {}".format(norm))
+		self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding)
+		if norm == "BN":
+			self.bn2 = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
+		elif norm == "GN" and num_groups != 0:
+			self.bn2 = nn.GroupNorm(num_groups, out_channels)
+		else:
+			raise RuntimeError("wrong norm option: {}".format(norm))
+		self.conv3 = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=2, padding=padding)
+		if norm == "BN":
+			self.bn3 = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
+		elif norm == "GN" and num_groups != 0:
+			self.bn3 = nn.GroupNorm(num_groups, out_channels)
+		else:
+			raise RuntimeError("wrong norm option: {}".format(norm))
 
 	def forward(self, x):
-		tmp = x.clone()
+		tmp = x
 		tmp = self.conv3(tmp)
 		tmp = self.bn3(tmp)
 		#tmp = self.relu(tmp)
@@ -47,8 +73,8 @@ class ConvBlock2(nn.Module):
 		x = self.bn1(x)
 		x = self.relu(x)
 		x = self.conv2(x)
-		x = self.bn2(x)
 		x += tmp
+		x = self.bn2(x)
 		out = self.relu(x)
 		#out = x + tmp
 		return out
@@ -62,7 +88,7 @@ class Up(nn.Module):
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
-            self.up = nn.Upsample(scale_factor=scale_factor, mode='bilinear', align_corners=True)
+            self.up = nn.Upsample(scale_factor=scale_factor, mode='nearest')
             #self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
         else:
             self.up = nn.ConvTranspose2d(in_channels , in_channels // 2, kernel_size=2, stride=2)
@@ -75,7 +101,7 @@ class Up(nn.Module):
 
 
 class BreastCNN(nn.Module):
-	def __init__(self, in_channels, out_channels, batch_norm_momentum=0.1, middle_channels=[16, 32, 64], unet_arch=False):
+	def __init__(self, in_channels, out_channels, norm_momentum=0.1, middle_channels=[16, 32, 64], unet_arch=False, norm="BN", num_groups=4):
 		super().__init__()
 
 		self.unet_arch = unet_arch
@@ -89,41 +115,41 @@ class BreastCNN(nn.Module):
 		#self.up2 = Up(middle_channels[2], 1, scale_factor=4)
 
 
-		self.blockDown1_1 = ConvBlock1(in_channels, middle_channels[0], batch_norm_momentum=batch_norm_momentum)
-		self.blockDown1_2 = ConvBlock1(middle_channels[0], middle_channels[0], batch_norm_momentum=batch_norm_momentum)
-		#self.blockDown1_3 = ConvBlock1(middle_channels[0], middle_channels[0], batch_norm_momentum=batch_norm_momentum)
+		self.blockDown1_1 = ConvBlock1(in_channels, middle_channels[0], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
+		self.blockDown1_2 = ConvBlock1(middle_channels[0], middle_channels[0], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
+		#self.blockDown1_3 = ConvBlock1(middle_channels[0], middle_channels[0], norm_momentum=norm_momentum)
 
-		self.blockDown2_1 = ConvBlock2(middle_channels[0], middle_channels[1], batch_norm_momentum=batch_norm_momentum)
-		self.blockDown2_2 = ConvBlock1(middle_channels[1], middle_channels[1], batch_norm_momentum=batch_norm_momentum)
-		self.blockDown2_3 = ConvBlock1(middle_channels[1], middle_channels[1], batch_norm_momentum=batch_norm_momentum)
+		self.blockDown2_1 = ConvBlock2(middle_channels[0], middle_channels[1], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
+		self.blockDown2_2 = ConvBlock1(middle_channels[1], middle_channels[1], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
+		self.blockDown2_3 = ConvBlock1(middle_channels[1], middle_channels[1], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
 		if self.unet_arch:
-			self.blockDown2_4 = ConvBlock1(middle_channels[1] + middle_channels[0], middle_channels[0], batch_norm_momentum=batch_norm_momentum)
+			self.blockDown2_4 = ConvBlock1(middle_channels[1] + middle_channels[0], middle_channels[0], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
 
 
-		self.blockDown3_1 = ConvBlock2(middle_channels[1], middle_channels[2], kernel_size_2=3, batch_norm_momentum=batch_norm_momentum)
-		self.blockDown3_2 = ConvBlock1(middle_channels[2], middle_channels[2], batch_norm_momentum=batch_norm_momentum)
-		self.blockDown3_3 = ConvBlock1(middle_channels[2], middle_channels[2], batch_norm_momentum=batch_norm_momentum)
+		self.blockDown3_1 = ConvBlock2(middle_channels[1], middle_channels[2], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
+		self.blockDown3_2 = ConvBlock1(middle_channels[2], middle_channels[2], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
+		self.blockDown3_3 = ConvBlock1(middle_channels[2], middle_channels[2], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
 		if self.unet_arch:
-			self.blockDown3_4 = ConvBlock1(middle_channels[2] +  middle_channels[1], middle_channels[1], batch_norm_momentum=batch_norm_momentum)
-			self.blockDown3_5 = ConvBlock1(middle_channels[1] +  middle_channels[0], middle_channels[0], batch_norm_momentum=batch_norm_momentum)
+			self.blockDown3_4 = ConvBlock1(middle_channels[2] +  middle_channels[1], middle_channels[1], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
+			self.blockDown3_5 = ConvBlock1(middle_channels[1] +  middle_channels[0], middle_channels[0], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
 
 
 		self.conv_1x1_1 = nn.Conv2d(middle_channels[0], out_channels, kernel_size=1)
-		self.bn_1x1_1 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
+		self.bn_1x1_1 = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
 		if self.unet_arch:
 			self.conv_1x1_2 = nn.Conv2d(middle_channels[0], out_channels, kernel_size=1)
 		else:
 			self.conv_1x1_2 = nn.Conv2d(middle_channels[1], out_channels, kernel_size=1)
-		self.bn_1x1_2 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
+		self.bn_1x1_2 = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
 		if self.unet_arch:
 			self.conv_1x1_3 = nn.Conv2d(middle_channels[0], out_channels, kernel_size=1)
 		else:
 			self.conv_1x1_3 = nn.Conv2d(middle_channels[2], out_channels, kernel_size=1)
-		self.bn_1x1_3 = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
+		self.bn_1x1_3 = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
 
 		# output
 		self.out_conv = nn.Conv2d(3, out_channels, kernel_size=1)
-		self.out_bn = nn.BatchNorm2d(out_channels, momentum=batch_norm_momentum)
+		self.out_bn = nn.BatchNorm2d(out_channels, momentum=norm_momentum)
 		self.out_relu = nn.ReLU(inplace=True)
 
 
@@ -133,9 +159,9 @@ class BreastCNN(nn.Module):
 		x = self.blockDown1_2(x)
 		#x = self.blockDown1_3(x)
 
-		x1 = x.clone()
+		x1 = x
 		if self.unet_arch:
-			x1_cat = x.clone()
+			x1_cat = x
 		x1 = self.conv_1x1_1(x1)
 		x1 = self.bn_1x1_1(x1)
 
@@ -143,9 +169,9 @@ class BreastCNN(nn.Module):
 		x = self.blockDown2_2(x)
 		x = self.blockDown2_3(x)
 
-		x2 = x.clone()
+		x2 = x
 		if self.unet_arch:
-			x2_cat = x.clone()
+			x2_cat = x
 			x2 = self.up1(x2)
 			x2 = torch.cat([x2, x1_cat], 1)
 			x2 = self.blockDown2_4(x2)
