@@ -316,7 +316,7 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	# train
 	train_images = {}
-	train_images_aapm = load_all_images(["FBP128", "PHANTOM"], n_batch=4, flatten_images=False)
+	train_images_aapm = load_all_images(["FBP128", "PHANTOM"], n_batch=4, flatten_images=False, z_norm=False, min_max_norm=True)
 	#train_images_leo = load_all_images(["AUG_BATCH", "AUG_TARGET"], n_batch=3, flatten_images=False)
 	train_images["INPUTS"] = train_images_aapm["FBP128"][:3950]
 	train_images["TARGETS"] = train_images_aapm["PHANTOM"][:3950]

@@ -10,7 +10,12 @@ import numpy as np
 import gzip
 
 
-def load_images(image_type : str, path : str="data", n_batch=4, flatten_images=False) -> np.ndarray:
+def load_images(
+		image_type : str,
+		path : str="data",
+		n_batch=4,
+		flatten_images=False,
+) -> np.ndarray:
 	"""
 	Read all the images (of certain type) located in the folder path.
 	The dtype are already encoded in float32.
@@ -34,8 +39,10 @@ def load_images(image_type : str, path : str="data", n_batch=4, flatten_images=F
 			f.close()
 		except:
 			batch = np.load(file)
+
 		data.append(batch)
 	data = np.concatenate(tuple(data))
+
 	if flatten_images:
 		data = data.reshape(data.shape[0], 1, data.shape[1] * data.shape[2])
 	else:
@@ -48,7 +55,9 @@ def load_all_images(image_types : list,
 	n_batch : int=4,
 	clip : bool=False,
 	flatten_images : bool=False,
-	images_not_to_reshape="PHANTOM") -> tuple:
+	images_not_to_reshape="PHANTOM",
+	min_max_norm=False,
+	z_norm=False) -> tuple:
 	"""
 	Read all the images located in the folder path.
 	The dtype are already encoded in float32.
@@ -64,13 +73,31 @@ def load_all_images(image_types : list,
 	train_images = {}
 	for image_type in image_types:
 		if images_not_to_reshape == image_type:
-			tmp_images = load_images(image_type, n_batch=n_batch, flatten_images=False)
+			tmp_images = load_images(image_type, n_batch=n_batch, flatten_images=False,
+									 min_max_norm=min_max_norm, z_norm=z_norm)
 		else:
-			tmp_images = load_images(image_type, n_batch=n_batch, flatten_images=flatten_images)
+			tmp_images = load_images(image_type, n_batch=n_batch, flatten_images=flatten_images,
+									 min_max_norm=min_max_norm, z_norm=z_norm)
 		if clip:
 			tmp_images = np.clip(tmp_images, 0, 1)
 		n_examples = tmp_images.shape[0]
+
+		if min_max_norm:
+			if image_type == "FBP128":
+				min_value, max_value = tmp_images.min(), tmp_images.max()
+			logging.info(f"Initial minimum value is {min_value}\nInitial maximum value is {max_value}")
+			data = (tmp_images - min_value) / (max_value - min_value)
+			logging.info(f"Final minimum value is {data.min()}\nFinal maximum value is {data.max()}")
+
+		if z_norm:
+			if image_type == "FBP128":
+				mean_value, std_value = np.mean(tmp_images.flatten()), np.std(tmp_images.flatten())
+			logging.info(f"Initial mean value is {mean_value}\nInitial std value is {std_value}")
+			data = (tmp_images - mean_value) / std_value
+			logging.info(f"Final mean value is {np.mean(data.flatten())}\nFinal std value is {np.std(data.flatten())}")
+
 		train_images[image_type.upper()] = tmp_images
+
 	return train_images
 
 
