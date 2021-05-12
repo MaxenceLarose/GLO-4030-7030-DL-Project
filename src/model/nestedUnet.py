@@ -98,7 +98,7 @@ class NestedUNet(nn.Module):
         self.conv1_3 = VGGBlock(nb_filter[1]*3+nb_filter[2], nb_filter[1], nb_filter[1], batch_norm_momentum=batch_norm_momentum)
 
         self.conv0_4 = VGGBlock(nb_filter[0]*4+nb_filter[1], nb_filter[0], nb_filter[0], batch_norm_momentum=batch_norm_momentum)
-        #self.activation_relu = nn.ReLU(inplace=True)
+        self.activation_relu = nn.ReLU(inplace=True)
 
         if self.deep_supervision:
             self.final1 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
@@ -138,4 +138,4 @@ class NestedUNet(nn.Module):
 
         else:
             output = self.final(x0_4)
-            return output
+            return self.activation_relu(output)
