@@ -21,6 +21,7 @@ from model.BREAST_CNN import BreastCNN
 from model.inceptionNet import InceptionNet
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
 from utils.data_augmentation import save_augmented_dataset
+from utils.sparse_sinogram_generator import save_sparse_sinograms
 from model.FCSinogramReconstruction import LinearWS, FCSinogramReconstruction
 
 
@@ -166,6 +167,10 @@ if __name__ == '__main__':
 	# log_device_setup()
 	#save_augmented_dataset()
 	#exit(0)
+
+	#save_sparse_sinograms(sparse_size=32)
+	#exit(0)
+
 	# --------------------------------------------------------------------------------- #
 	#                            Constants                                              #
 	# --------------------------------------------------------------------------------- #
