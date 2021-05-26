@@ -22,11 +22,13 @@ class RED_CNN(nn.Module):
         self.tconv3 = nn.ConvTranspose2d(out_ch, out_ch, kernel_size=5)
         self.tconv4 = nn.ConvTranspose2d(out_ch, out_ch, kernel_size=5)
         self.tconv5 = nn.ConvTranspose2d(out_ch, 1, kernel_size=5)
+        self.up = nn.Upsample(scale_factor=(4, 1), mode='bilinear', align_corners=True)
 
         self.relu = nn.ReLU()
 
     def forward(self, x):
         # encoder
+        x = self.up(x)
         residual_1 = x
         out = self.relu(self.conv1(x))
         out = self.relu(self.conv2(out))

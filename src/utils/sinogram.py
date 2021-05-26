@@ -11,6 +11,7 @@ from scipy.interpolate import interp1d
 def save_sparse_sinograms(
         sparse_size: int,
         path: str = "data",
+        filename: str = "Sinogram",
         n_batch=4,
 ):
     """
@@ -26,7 +27,7 @@ def save_sparse_sinograms(
     """
     logging.info(f"\n{'-' * 25}\nGenerating SPARSE data files\n{'-' * 25}")
     for batch in range(1, n_batch + 1):
-        sinogram_file = glob.glob(os.path.join(path, "Sinogram_batch{}.npy*".format(batch)))[0]
+        sinogram_file = glob.glob(os.path.join(path, "{}_batch{}.npy*".format(filename,batch)))[0]
         logging.info(f"Loading file {sinogram_file}")
         try:
             f = gzip.GzipFile(sinogram_file, "r")

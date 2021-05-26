@@ -42,11 +42,17 @@ def draw_data_targets(dataset : Dataset, image_idx=0):
 	plt.show()
 
 def draw_data_targets_2(data, target, image_idx=0):
-	fig, ax = plt.subplots(1, 2)
+	size_split = 10
+	fig, ax = plt.subplots(1, 3)
 	ax[0].imshow(data[0][0])
 	ax[0].set_title("Data")
 	ax[1].imshow(target[0][0])
 	ax[1].set_title("Target")
+	im = ax[2].imshow(data[0][0]-target[0][0])
+	ax[2].set_title("Diff")
+	divider1 = make_axes_locatable(ax[2])
+	cax1 = divider1.append_axes("right", size="{}%".format(size_split), pad=0.05)
+	cbar1 = plt.colorbar(im, cax=cax1)
 	plt.show()
 
 

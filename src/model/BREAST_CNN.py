@@ -101,10 +101,13 @@ class Up(nn.Module):
 
 
 class BreastCNN(nn.Module):
-	def __init__(self, in_channels, out_channels, norm_momentum=0.1, middle_channels=[16, 32, 64], unet_arch=False, norm="BN", num_groups=4):
+	def __init__(self, in_channels, out_channels, norm_momentum=0.1, middle_channels=[16, 32, 64], unet_arch=False, norm="BN", num_groups=4,
+		sparse_sinogram_net=False):
 		super().__init__()
-
+		self.sparse_sinogram_net = sparse_sinogram_net
 		self.unet_arch = unet_arch
+		if self.sparse_sinogram_net:
+			self.up = nn.Upsample(scale_factor=(4,1), mode='bilinear', align_corners=True)
 		self.up1 = nn.Upsample(scale_factor=2, mode='nearest')
 		if self.unet_arch:
 			self.up2 = nn.Upsample(scale_factor=2, mode='nearest')
@@ -155,6 +158,9 @@ class BreastCNN(nn.Module):
 
 
 	def forward(self, x):
+		if self.sparse_sinogram_net:
+			x = self.up(x)
+			res = x
 		x = self.blockDown1_1(x)
 		x = self.blockDown1_2(x)
 		#x = self.blockDown1_3(x)
@@ -201,7 +207,9 @@ class BreastCNN(nn.Module):
 			x = self.up2(x)
 
 		out = self.out_conv(torch.cat([x, x1, x2], 1))
-		out = self.out_bn(out)
+		if self.sparse_sinogram_net:
+			out += res
+		# out = self.out_bn(out)
 		out = self.out_relu(out)
 		return out
 		#return [out, x, x2, x1]

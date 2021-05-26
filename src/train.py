@@ -22,7 +22,7 @@ from model.inceptionNet import InceptionNet
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
 from utils.data_augmentation import save_augmented_dataset
 from utils.sinogram import save_sparse_sinograms, save_interpolated_sinograms
-from model.FCSinogramReconstruction import LinearWS, FCSinogramReconstruction
+from model.FCSinogramReconstruction import SinogramInterpolator
 
 
 from deeplib.history import History
@@ -86,11 +86,11 @@ def train_network(
 	# --------------------------------------------------------------------------------- #
 	history_callback = HistoryCallback()
 	checkpoint_callback = ModelCheckpoint("{}_best.pt".format(save_path), save_best_only=True)
-	# if lr_decay	<= 0:
-	# 	scheduler = ReduceLROnPlateau(patience=3, factor=0.333)
-	# else:
-	# 	scheduler = ExponentialLR(lr_decay)
-	scheduler = ExponentialLR(lr_decay)
+	if lr_decay	<= 0:
+		scheduler = ReduceLROnPlateau(patience=5, factor=0.5)
+	else:
+		scheduler = ExponentialLR(lr_decay)
+	# scheduler = ExponentialLR(lr_decay)
 	callbacks = [
 		history_callback, checkpoint_callback, scheduler] if callbacks is None else [
 		history_callback, checkpoint_callback, scheduler] + callbacks
@@ -101,7 +101,7 @@ def train_network(
 			valid_dataset, batch_size=batch_size, train_split=1)
 	else:
 		train_loader, valid_loader = train_valid_loaders(
-			dataset, batch_size=batch_size, train_split=0.95)
+			dataset, batch_size=batch_size, train_split=0.95, seed=65)
 	if optimizer == "Adam":
 		opt = optim.Adam(network.parameters(), lr=lr, weight_decay=weight_decay)
 	elif optimizer == "SGD":
@@ -127,6 +127,8 @@ def train_network(
 			epochs=n_epoch,
 			progress_options=dict(coloring=False),
 			callbacks=callbacks)
+		# model.evaluate_generator(train_loader)
+		# exit(0)
 		# --------------------------------------------------------------------------------- #
 		#                            save model at the end                                  #
 		# --------------------------------------------------------------------------------- #
@@ -144,9 +146,9 @@ def train_network(
 				inputs = inputs.cuda()
 				targets = targets.cuda()
 			res = model.evaluate_on_batch(inputs, targets, return_pred=True)
+			inputs = inputs.cpu().numpy()
 			targets = targets.cpu().numpy()
 			draw_data_targets_2(res[-1], targets, image_idx=0)
-			exit(0)
 	#if dataset_test_challenge is not None:
 	#	test_loader = DataLoader(dataset_test_challenge, batch_size=batch_size)
 		#validate_model(model, test_loader, save_data=True, output_path="data/challenge", evaluate_worst_RMSE=False)
@@ -168,7 +170,7 @@ if __name__ == '__main__':
 	#save_augmented_dataset()
 	#exit(0)
 
-	#save_sparse_sinograms(sparse_size=32)
+	#save_sparse_sinograms(sparse_size=128, filename="Sinoleo")
 	#exit(0)
 
 	#save_interpolated_sinograms(interpolated_size=128, show=True)
@@ -183,12 +185,12 @@ if __name__ == '__main__':
 	load_network_state = False
 	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 300
-	batch_size = 2
-	weight_decay = 1e-4
+	n_epoch = 200
+	batch_size = 4
+	weight_decay = 1e-4 * 0.5
 	criterion = "RMSELoss"
 	optimizer = "Adam"
-	lr_decay = 0.99
+	lr_decay = -1
 	# unet setup constants
 	if batch_size == 1:
 		batch_norm_momentum = 0.01
@@ -199,13 +201,14 @@ if __name__ == '__main__':
 	norm = "BN"
 	num_groups = 8
 	# seed
-	seed = 42
+	seed = 111
 	set_seed(seed)
 	# --------------------------------------------------------------------------------- #
 	#                            network                                                #
 	# --------------------------------------------------------------------------------- #
 	available_networks = [
 		"UNet",
+		"UNetSinogramInterpolator",
 		"NestedUNet",
 		"InceptionUNet",
 		"InceptionNet",
@@ -213,17 +216,21 @@ if __name__ == '__main__':
 		"Pretrained Simple UNet",
 		"Pretrained RED_CNN",
 		"BreastUNet",
+		"BreastUNetSinogramInterpolator",
 		"Pretrained SMP UNet",
 		"SMP UNet",
 		"BreastCNN",
-		"LinearWS"
+		"SinogramInterpolator"
 	]
 	network_to_use: str = "BreastUNet"
 	if network_to_use not in available_networks:
 		raise NotImplementedError(
 			f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
 	elif network_to_use == "UNet":
-		model = UNet(1,1, filters=[32, 64, 128, 256, 512], norm=norm, num_groups=num_groups)
+		model = UNet(1,1, filters=[64, 128, 256, 512, 1024], norm=norm, num_groups=num_groups)
+		preprocessing = None
+	elif network_to_use == "UNetSinogramInterpolator":
+		model = UNet(1,1, filters=[32, 64, 128, 256, 512], norm=norm, num_groups=num_groups, sparse_sinogram_net=True)
 		preprocessing = None
 	elif network_to_use == "Pretrained SMP UNet":
 		encoder = "resnet34"
@@ -265,19 +272,22 @@ if __name__ == '__main__':
 			activation=None
 		)
 	elif network_to_use == "NestedUNet":
-		nb_filter=(64, 128, 256, 512, 1024)
-		model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, deep_survervision=True)
+		nb_filter=(32, 64, 128, 256, 512)
+		model = NestedUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, deep_survervision=False)
 		preprocessing = None
 	elif network_to_use == "InceptionUNet":
 		nb_filter=(32, 64, 128, 256, 512)
 		model = InceptionUNet(1,1, nb_filter=nb_filter, batch_norm_momentum=batch_norm_momentum, kernel_size_1=[5,5,5,5,5], kernel_size_2=[3,3,3,3,3])
 		preprocessing = None
 	elif network_to_use == "InceptionNet":
-		model = InceptionNet(1, 1, 64, n_inception_blocks=5, batch_norm_momentum=batch_norm_momentum,
-			use_maxpool=True)
+		model = InceptionNet(1, 1, 32, n_inception_blocks=4, batch_norm_momentum=batch_norm_momentum,
+			use_maxpool=False, up=[False, False, False, False], kernel_asym_dim=3)
 		preprocessing = None
 	elif network_to_use == "BreastUNet":
-		model = BreastCNN(1, 1, norm_momentum=batch_norm_momentum, middle_channels=[64, 128, 256], unet_arch=True)
+		model = BreastCNN(1, 1, norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=True)
+		preprocessing = None
+	elif network_to_use == "BreastUNetSinogramInterpolator":
+		model = BreastCNN(1, 1, norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=True, sparse_sinogram_net=True)
 		preprocessing = None
 	elif network_to_use == "BreastCNN":
 		model = BreastCNN(1, 1, norm_momentum=batch_norm_momentum, middle_channels=[16, 32, 64], unet_arch=False)
@@ -311,9 +321,10 @@ if __name__ == '__main__':
 	elif network_to_use == "Pretrained RED_CNN":
 		model = PretrainedREDCNN(unfreezed_layers=["conv", "tconv"])
 		preprocessing = None
-	elif network_to_use == "LinearWS":
-		model = LinearWS(128, 1024, 512)
+	elif network_to_use == "SinogramInterpolator":
+		#model = SinogramInterpolator(128, 1024, 512)
 		#model = FCSinogramReconstruction(128, 1024, 512, 5, 256)
+		model = SinogramInterpolator(1, 32, 1)
 		preprocessing = None
 	else:
 		warnings.warn("Something very wrong happened")
@@ -324,10 +335,13 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	# train
 	train_images = {}
-	train_images_aapm = load_all_images(["FBP128", "PHANTOM"], n_batch=4, flatten_images=False, z_norm=False, min_max_norm=True)
-	#train_images_leo = load_all_images(["AUG_BATCH", "AUG_TARGET"], n_batch=3, flatten_images=False)
-	train_images["INPUTS"] = train_images_aapm["FBP128"][:3950]
-	train_images["TARGETS"] = train_images_aapm["PHANTOM"][:3950]
+	train_images_aapm_osc_tv = load_all_images(["OSC_TV_AAPM"], n_batch=4, ext=".mha")
+	#train_images_aapm_fbp = load_all_images(["FBP128"], n_batch=4)
+	train_images_aapm_target = load_all_images(["PHANTOM"], n_batch=4)
+
+	#train_images["INPUTS"] = np.concatenate([train_images_aapm_osc_tv["OSC_TV_AAPM"], train_images_aapm_fbp["FBP128"]], axis=1)
+	train_images["INPUTS"] =train_images_aapm_osc_tv["OSC_TV_AAPM"]
+	train_images["TARGETS"] = train_images_aapm_target["PHANTOM"]
 	# train_images["INPUTS"] = np.concatenate((train_images_aapm["FBP128"][:3950], train_images_leo["AUG_BATCH"]))
 	# train_images["TARGETS"] = np.concatenate((train_images_aapm["PHANTOM"][:3600], train_images_leo["AUG_TARGET"]))
 	train_dataset = BreastCTDataset(train_images["INPUTS"], train_images["TARGETS"], preprocessing=preprocessing)
@@ -337,14 +351,14 @@ if __name__ == '__main__':
 
 	# valid
 	valid_images = {}
-	valid_images["INPUTS"] = train_images_aapm["FBP128"][3950:]
-	valid_images["TARGETS"] = train_images_aapm["PHANTOM"][3950:]
+	# valid_images["INPUTS"] = train_images_aapm["FBP128"][3950:]
+	# valid_images["TARGETS"] = train_images_aapm["PHANTOM"][3950:]
 
 	#valid_images["INPUTS"] = np.concatenate((train_images_aapm["FBP128"][1500:], train_images_leo["FBP_"][1500:]))
 	#valid_images["TARGETS"] = np.concatenate((train_images_aapm["PHANTOM"][500:], train_images_leo["VIRTUAL_BREAST"][3500:]))
-	valid_dataset = BreastCTDataset(valid_images["INPUTS"], valid_images["TARGETS"], preprocessing=preprocessing)
+	#valid_dataset = BreastCTDataset(valid_images["INPUTS"], valid_images["TARGETS"], preprocessing=preprocessing)
 
-	#valid_dataset = None
+	valid_dataset = None
 	valid_images_contest = None
 
 	# --------------------------------------------------------------------------------- #

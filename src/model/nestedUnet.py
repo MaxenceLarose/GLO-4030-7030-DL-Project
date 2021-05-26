@@ -138,4 +138,4 @@ class NestedUNet(nn.Module):
 
         else:
             output = self.final(x0_4)
-            return self.activation_relu(output)
+            return output

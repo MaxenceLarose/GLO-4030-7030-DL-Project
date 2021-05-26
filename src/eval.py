@@ -110,7 +110,7 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	use_gpu = True
 	debug = True
-	batch_size = 1
+	batch_size = 4
 	criterion = "RMSELoss"
 	optimizer = "Adam"
 	eval_train_images = True
@@ -134,6 +134,7 @@ if __name__ == '__main__':
 	# --------------------------------------------------------------------------------- #
 	available_networks = [
 		"UNet",
+		"UNetSinogramInterpolator",
 		"NestedUNet",
 		"InceptionUNet",
 		"InceptionNet",
@@ -154,19 +155,23 @@ if __name__ == '__main__':
 	# 	"BreastUNet"
 	# ]
 	networks_to_use: List[str] = [
-		"UNet_diff"
+		"UNetSinogramInterpolator"
 	]
 
 	# --------------------------------------------------------------------------------- #
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
+	preprocessing = None
 	if eval_train_images:
-		_, train_images = load_all_images(n_batch=n_data_batch, shuffle=False, image_types=["FBP", "DIFF", "Sinogram"], train_split=0.9)
-		aapm_dataset = BreastCTDataset(train_images["FBP"], train_images["PHANTOM"], preprocessing=None)
+		train_images = {}
+		train_images_aapm = load_all_images(["SINOGRAM128", "SINOGRAM512"], n_batch=4, flatten_images=False, z_norm=False, min_max_norm=False)
+		train_images["INPUTS"] = train_images_aapm["SINOGRAM128"]
+		train_images["TARGETS"] = train_images_aapm["SINOGRAM512"]
+		train_dataset = BreastCTDataset(train_images["INPUTS"], train_images["TARGETS"], preprocessing=preprocessing)
 		# if debug:
 		# 	aapm_dataset = Subset(aapm_dataset, [0, 1])
 
-		test_loader = DataLoader(aapm_dataset, batch_size=batch_size, shuffle=False)
+		test_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 
 	for network_to_use in networks_to_use:
 		if network_to_use not in available_networks:
@@ -174,6 +179,9 @@ if __name__ == '__main__':
 				f"Chosen network isn't implemented \nImplemented networks are {available_networks}.")
 		elif network_to_use == "UNet":
 			model = UNet(1,1)
+			preprocessing = None
+		elif network_to_use == "UNetSinogramInterpolator":
+			model = UNet(1,1, filters=[32, 64, 128, 256, 512], sparse_sinogram_net=True)
 			preprocessing = None
 		elif network_to_use == "Pretrained SMP UNet":
 			encoder = "resnet34"
@@ -267,7 +275,7 @@ if __name__ == '__main__':
 		# --------------------------------------------------------------------------------- #
 		#                            network prediction                                     #
 		# --------------------------------------------------------------------------------- #
-		model_weigths_path = "model/models_weights_final/{}_weights_best.pt".format(network_to_use)
+		model_weigths_path = "model/models_weights/{}_weights_best.pt".format(network_to_use)
 		save_path_for_predictions = "results/{}/train_images_prediction".format(network_to_use)
 
 		logging.info(f"Begin validation of network {network_to_use}.")

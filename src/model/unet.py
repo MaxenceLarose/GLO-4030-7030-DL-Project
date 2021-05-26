@@ -105,11 +105,15 @@ class OutConv(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, n_channels, n_classes, filters=[32, 64, 128, 256, 512], bilinear=True, out_relu=False, norm="BN", num_groups=4):
+    def __init__(self, n_channels, n_classes, filters=[32, 64, 128, 256, 512], bilinear=True, out_relu=False, norm="BN", num_groups=4,
+        sparse_sinogram_net=False):
         super(UNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.bilinear = bilinear
+        self.sparse_sinogram_net = sparse_sinogram_net
+        if sparse_sinogram_net:
+            self.up = nn.Upsample(scale_factor=(4, 1), mode='bicubic', align_corners=False)
 
         self.inc = DoubleConv(n_channels, filters[0], norm=norm, num_groups=num_groups)
         self.down1 = Down(filters[0], filters[1], norm=norm, num_groups=num_groups)
@@ -122,8 +126,12 @@ class UNet(nn.Module):
         self.up3 = Up(filters[2], filters[1] // factor, bilinear, norm=norm, num_groups=num_groups)
         self.up4 = Up(filters[1], filters[0], bilinear, norm=norm, num_groups=num_groups)
         self.outc = OutConv(filters[0], n_classes, out_relu=out_relu)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
+        if self.sparse_sinogram_net:
+            x = self.up(x)
+            res = x
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
@@ -133,5 +141,9 @@ class UNet(nn.Module):
         x = self.up2(x, x3)
         x = self.up3(x, x2)
         x = self.up4(x, x1)
-        logits = self.outc(x)
+        if self.sparse_sinogram_net:
+            logits = self.outc(x) + res
+        else:
+            logits = self.outc(x)
+        logits = self.relu(logits)
         return logits

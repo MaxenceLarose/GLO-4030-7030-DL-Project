@@ -4,10 +4,14 @@ import glob
 import os
 import math
 from typing import List
+import SimpleITK as sitk
 
 # Specialized python lib
 import numpy as np
 import gzip
+
+def img2array (img_path):
+    return sitk.GetArrayFromImage(sitk.ReadImage(str(img_path), sitk.sitkFloat32))
 
 
 def load_images(
@@ -15,6 +19,7 @@ def load_images(
 		path : str="data",
 		n_batch=4,
 		flatten_images=False,
+		ext=".npy"
 ) -> np.ndarray:
 	"""
 	Read all the images (of certain type) located in the folder path.
@@ -28,17 +33,20 @@ def load_images(
 	return:
 		The image dataset (ndarray)
 	"""
-	files = glob.glob(os.path.join(path, "{}*.npy*".format(image_type)))
+	files = glob.glob(os.path.join(path, "{}*{}*".format(image_type, ext)))
 	data = []
 	logging.info(f"\n{'-' * 25}\nLoading {image_type}\n{'-' * 25}")
 	for file in files[:n_batch]:
 		logging.info(f"Loading file {file}")
-		try:
-			f = gzip.GzipFile(file, "r")
-			batch = np.load(f)
-			f.close()
-		except:
-			batch = np.load(file)
+		if ext == ".npy":
+			try:
+				f = gzip.GzipFile(file, "r")
+				batch = np.load(f)
+				f.close()
+			except:
+				batch = np.load(file)
+		else:
+			batch = img2array(file)
 
 		data.append(batch)
 	data = np.concatenate(tuple(data))
@@ -57,7 +65,8 @@ def load_all_images(image_types : list,
 	flatten_images : bool=False,
 	images_not_to_reshape="PHANTOM",
 	min_max_norm=False,
-	z_norm=False) -> tuple:
+	z_norm=False,
+	ext=".npy") -> tuple:
 	"""
 	Read all the images located in the folder path.
 	The dtype are already encoded in float32.
@@ -73,11 +82,9 @@ def load_all_images(image_types : list,
 	train_images = {}
 	for image_type in image_types:
 		if images_not_to_reshape == image_type:
-			tmp_images = load_images(image_type, n_batch=n_batch, flatten_images=False,
-									 min_max_norm=min_max_norm, z_norm=z_norm)
+			tmp_images = load_images(image_type, n_batch=n_batch, flatten_images=False, ext=ext)
 		else:
-			tmp_images = load_images(image_type, n_batch=n_batch, flatten_images=flatten_images,
-									 min_max_norm=min_max_norm, z_norm=z_norm)
+			tmp_images = load_images(image_type, n_batch=n_batch, flatten_images=flatten_images, ext=ext)
 		if clip:
 			tmp_images = np.clip(tmp_images, 0, 1)
 		n_examples = tmp_images.shape[0]

@@ -63,14 +63,22 @@ def train_valid_loaders(dataset, batch_size, train_split=0.8, shuffle=True, seed
         np.random.seed(seed)
         np.random.shuffle(indices)
 
-    split = math.floor(train_split * num_data)
-    train_idx, valid_idx = indices[:split], indices[split:]
+    if train_split < 1 and train_split >= 0:
+        split = math.floor(train_split * num_data)
+        train_idx, valid_idx = indices[:split], indices[split:]
 
-    train_dataset = Subset(dataset, train_idx)
-    valid_dataset = Subset(dataset, valid_idx)
+        train_dataset = Subset(dataset, train_idx)
+        valid_dataset = Subset(dataset, valid_idx)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
+    elif train_split == 1:
+        print("HERE")
+        train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        valid_loader = None
+    else:
+        raise RuntimeError("train_valid_loaders wrong train split input. \
+            Excpected value between 0 and 1 but got {} instead".format(train_split))
 
     return train_loader, valid_loader
 
