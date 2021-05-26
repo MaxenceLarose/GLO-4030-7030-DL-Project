@@ -4,11 +4,13 @@ import os
 import warnings
 import numpy as np
 import pprint
+from typing import Callable
 
 import matplotlib.pyplot as plt
 
 import torch.optim as optim
 import torch.nn as nn
+import torch.nn.init as init
 import torch
 from torch.utils.data import DataLoader
 from model.unet import UNet
@@ -35,6 +37,26 @@ from model.metrics import validate_model, RMSELoss
 from data_loader.data_loaders import load_all_images, load_images
 from data_loader.datasets import BreastCTDataset, train_valid_loaders
 from logger.logging_tools import logs_file_setup, log_device_setup, set_seed
+
+
+def initialize_network_(network: nn.Module, initialization_function_: Callable, **func_kwargs):
+    """
+    Function used to initialize the weights of a neural network with the given initialization function.
+    The bias weights will be initialized to zero.
+
+    Args :
+        network: The neural network that will be initialized.
+        initialization_function_: The initialization function. A callable that take weights as a torch.Tensor and
+                                  other kwargs. The modification must be done inplace.
+        func_kwargs: The kwargs of the initialization function.
+
+    Returns :
+        None
+    """
+    for module in network.modules():
+        if isinstance(module, nn.Conv2d):
+            initialization_function_(module.weight, **func_kwargs)
+            init.zeros_(module.bias)
 
 
 # Fonction qui provient de la librairie deeplib (https://github.com/ulaval-damas/glo4030-labs/tree/master/deeplib)
@@ -200,6 +222,13 @@ if __name__ == '__main__':
 		batch_norm_momentum = 0.1
 	norm = "BN"
 	num_groups = 8
+
+	init_funcs = {
+		"Xavier_Normal": dict(func=init.xavier_normal_, func_kwargs=dict(gain=1)),
+		"Kaiming_Uniform": dict(func=init.kaiming_normal_, func_kwargs=dict(a=1)),
+	}
+	initialization: str = "Kaiming_Uniform"
+
 	# seed
 	seed = 111
 	set_seed(seed)
@@ -360,6 +389,12 @@ if __name__ == '__main__':
 
 	valid_dataset = None
 	valid_images_contest = None
+
+	# --------------------------------------------------------------------------------- #
+	#                         network initialization                                    #
+	# --------------------------------------------------------------------------------- #
+	params = init_funcs[initialization]
+	initialize_network_(model, params["func"], **params["func_kwargs"])
 
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #
