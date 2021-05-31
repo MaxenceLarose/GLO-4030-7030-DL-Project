@@ -3,6 +3,7 @@ import os
 from typing import Tuple, List, Dict
 import logging
 from typing import Callable
+import matplotlib.pyplot as plt
 
 import poutyne as pt
 import torch
@@ -260,11 +261,31 @@ class EnsembleVoting(object):
             model = pt.Model(self.network, optimizer=None, loss_function=loss)
         else:
             model = pt.Model(self.network, optimizer=None, loss_function=loss)
-            model.load_weights(f"{save_path}/{self._method}.pt")
+            model.load_weights(f"{save_path}/{self._method}_best.pt")
 
         logging.info(f"\nModel weights are \n{model.get_weights()}.\n")
+        #test_metrics = model.evaluate_generator(loaders["test"])
+        output_path="results_challenge/ensemble_method"
+        pred_folder="res"
+        target_folder="ref"
+        # exit(0)
+        results = model.evaluate_generator(
+        loaders["test"],
+        return_pred=True,
+        return_ground_truth=True,
+        progress_options=dict(coloring=False))
+        if not os.path.isdir(os.path.join(output_path, pred_folder)):
+            os.makedirs(os.path.join(output_path, pred_folder))
+        if not os.path.isdir(os.path.join(output_path, target_folder)):
+            os.makedirs(os.path.join(output_path, target_folder))
+        np.save(os.path.join(output_path, pred_folder, "predictions"), np.squeeze(results[1]))
+        np.save(os.path.join(output_path, target_folder, "targets"), np.squeeze(results[2]))
+        x = np.load(os.path.join(output_path, pred_folder, "predictions.npy"))
+        print(x.shape)
 
-        test_metrics = model.evaluate_generator(loaders["test"])
+        plt.imshow(x[99])
+        plt.show()
+        #contest_metric_evaluation(output_path, output_path, evaluate_worst_RMSE=False)
 
         # -- Debug -- #
         # test_metrics = model.evaluate_generator(loaders["test"], return_pred=True, return_ground_truth=True)
