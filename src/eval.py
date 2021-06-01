@@ -145,6 +145,12 @@ if __name__ == '__main__':
 		"Pretrained SMP UNet",
 		"SMP UNet",
 		"BreastCNN",
+		"BreastUNet8",
+		"BreastUNet2",
+		"BreastUNet3",
+		"BreastUNet4",
+		"BreastUNet5",
+		"BreastUNet7"
 	]
 
 	# networks_to_use: List[str] = [
@@ -155,18 +161,26 @@ if __name__ == '__main__':
 	# 	"BreastUNet"
 	# ]
 	networks_to_use: List[str] = [
-		"UNetSinogramInterpolator"
+		"BreastUNet8"
 	]
-
+	dataset_to_eval = "test" # or test
 	# --------------------------------------------------------------------------------- #
 	#                            dataset                                                #
 	# --------------------------------------------------------------------------------- #
 	preprocessing = None
 	if eval_train_images:
 		train_images = {}
-		train_images_aapm = load_all_images(["SINOGRAM128", "SINOGRAM512"], n_batch=4, flatten_images=False, z_norm=False, min_max_norm=False)
-		train_images["INPUTS"] = train_images_aapm["SINOGRAM128"]
-		train_images["TARGETS"] = train_images_aapm["SINOGRAM512"]
+		if dataset_to_eval == "test":
+			train_images_aapm = load_all_images(["TEST_OSC"], n_batch=1)
+			train_images["INPUTS"] = train_images_aapm["TEST_OSC"]
+			train_images["TARGETS"] = train_images_aapm["TEST_OSC"]
+		elif dataset_to_eval == "train":
+			train_images_aapm = load_all_images(["OSC_TV_AAPM"], ext=".mha", n_batch=4)
+			train_images["INPUTS"] = train_images_aapm["OSC_TV_AAPM"]
+			train_images_aapm = load_all_images(["PHANTOM"], n_batch=4)
+			train_images["TARGETS"] = train_images_aapm["PHANTOM"]
+		else:
+			raise RuntimeError("Wrong dataset to eval. The choice is train or test.")
 		train_dataset = BreastCTDataset(train_images["INPUTS"], train_images["TARGETS"], preprocessing=preprocessing)
 		# if debug:
 		# 	aapm_dataset = Subset(aapm_dataset, [0, 1])
@@ -234,8 +248,8 @@ if __name__ == '__main__':
 			model = InceptionNet(1, 1, 64, n_inception_blocks=5, batch_norm_momentum=batch_norm_momentum,
 				use_maxpool=True)
 			preprocessing = None
-		elif network_to_use == "BreastUNet":
-			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=True)
+		elif "BreastUNet" in network_to_use:
+			model = BreastCNN(1, 1, norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=True, upsample_mode="bicubic")
 			preprocessing = None
 		elif network_to_use == "BreastCNN":
 			model = BreastCNN(1, 1, batch_norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=False)
@@ -275,8 +289,13 @@ if __name__ == '__main__':
 		# --------------------------------------------------------------------------------- #
 		#                            network prediction                                     #
 		# --------------------------------------------------------------------------------- #
-		model_weigths_path = "model/models_weights/{}_weights_best.pt".format(network_to_use)
-		save_path_for_predictions = "results/{}/train_images_prediction".format(network_to_use)
+		model_weigths_path = "model/models_weights_challenge/{}_weights_best.pt".format(network_to_use)
+		if dataset_to_eval == "test":
+			save_path_for_predictions = "results_challenge/yolo/{}/train_images_prediction".format(network_to_use)
+		elif dataset_to_eval == "train":
+			save_path_for_predictions = "results_challenge/{}/train_images_prediction".format(network_to_use)
+		else:
+			raise RuntimeError("Wrong dataset to eval. The choice is train or test.")
 
 		logging.info(f"Begin validation of network {network_to_use}.")
 		eval_model(
@@ -304,7 +323,7 @@ if __name__ == '__main__':
 			size_split = 10
 			# pred - target
 			diff = pred_image 
-			im1 = ax.imshow(diff, cmap='Greys', vmin=-0.001, vmax=0.001)
+			im1 = ax.imshow(target_image, cmap='Greys')
 			logging.info(f"The mean diff is {np.mean(diff)}.")
 			divider1 = make_axes_locatable(ax)
 			cax1 = divider1.append_axes("right", size="{}%".format(size_split), pad=0.05)
@@ -313,12 +332,12 @@ if __name__ == '__main__':
 			ax.set_yticks([])
 			#ax.set_title("Target")
 			plt.savefig(os.path.join(save_path_for_predictions, "diff_{}.jpg".format(random_idx)))
-			plt.show()
-
+			#plt.show()
+			fig, ax = plt.subplots()
 			# prediction
-			# im2 = ax[1].imshow(pred_image, cmap='Greys')
-			# divider2 = make_axes_locatable(ax[1])
-			# cax2 = divider2.append_axes("right", size="{}%".format(size_split), pad=0.05)
-			# cbar2 = plt.colorbar(im2, cax=cax2)
-			# ax[1].set_title("Prediction")
-			# plt.show()
+			im2 = ax.imshow(pred_image, cmap='Greys')
+			divider2 = make_axes_locatable(ax)
+			cax2 = divider2.append_axes("right", size="{}%".format(size_split), pad=0.05)
+			cbar2 = plt.colorbar(im2, cax=cax2)
+			ax.set_title("Prediction")
+			plt.show()

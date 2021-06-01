@@ -29,7 +29,7 @@ if __name__ == '__main__':
     batch_size = 1
 
     # Models
-    models = ["BreastUNet", "InceptionUNet", "UNet", "NestedUNet"]
+    models = ["BreastUNet5", "BreastUNet6", "BreastUNet7", "BreastUNet8"]
 
     # Method
     available_methods = [
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     method = available_methods[2]
 
     # Number of networks in the ensemble
-    ensemble_size = 4
+    ensemble_size = len(models)
 
     criterion = "RMSELoss"
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     #                              Models scores                                        #
     # --------------------------------------------------------------------------------- #
     models_loss: list = [
-        np.loadtxt(fname=f"results/{model}/train_images_prediction/scores.txt", usecols=1)[0] for model in models
+        np.loadtxt(fname=f"results_challenge/{model}/train_images_prediction/scores.txt", usecols=1)[0] for model in models
     ]
 
     # --------------------------------------------------------------------------------- #
@@ -75,7 +75,9 @@ if __name__ == '__main__':
         models=models,
         image_types=["predictions", "targets"],
         n_batch=1,
-        ratio_of_images_to_use=1
+        ratio_of_images_to_use=1,
+        train_split=0,
+        path="results_challenge/yolo",
     )
 
     test_dataset = BreastCTDataset(

@@ -25,15 +25,15 @@ if __name__ == '__main__':
     #                            Constants                                              #
     # --------------------------------------------------------------------------------- #
     # training setup constants
-    lr = 0.01
-    epochs = 100
+    lr = 0.001
+    epochs = 200
     weight_decay = 1e-4
 
     # dataset constants
     batch_size = 1
 
     # Models
-    models = ["BreastUNet", "InceptionUNet", "UNet", "NestedUNet"]
+    models = ["BreastUNet5", "BreastUNet6", "BreastUNet7", "BreastUNet8"]
 
     # Methods
     available_methods = [
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     method = available_methods[2]
 
     # Number of networks in the ensemble
-    ensemble_size = 4
+    ensemble_size = len(models)
 
     # seed
     seed = 42
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     #                              Models scores                                        #
     # --------------------------------------------------------------------------------- #
     models_loss: list = [
-        np.loadtxt(fname=f"results/{model}/train_images_prediction/scores.txt", usecols=1)[0] for model in models
+        np.loadtxt(fname=f"results_challenge/{model}/train_images_prediction/scores.txt", usecols=1)[0] for model in models
     ]
 
     # --------------------------------------------------------------------------------- #
@@ -64,8 +64,8 @@ if __name__ == '__main__':
         method=method,
         input_shape=(ensemble_size, 512, 512),
         loss_rmse=models_loss,
-        kernel_size=3,
-        padding=1
+        kernel_size=1,
+        padding=0
     )
 
     # --------------------------------------------------------------------------------- #
@@ -78,7 +78,9 @@ if __name__ == '__main__':
         models=models,
         image_types=["predictions", "targets"],
         n_batch=1,
-        ratio_of_images_to_use=1
+        ratio_of_images_to_use=1,
+        path="results_challenge",
+        train_split=1
     )
 
     train_valid_dataset = BreastCTDataset(
@@ -86,7 +88,7 @@ if __name__ == '__main__':
         train_images["TARGETS"]
     )
 
-    train_loader, valid_loader = train_valid_loaders(train_valid_dataset, batch_size=batch_size, train_split=0.9)
+    train_loader, valid_loader = train_valid_loaders(train_valid_dataset, batch_size=batch_size, train_split=0.95)
     loaders = dict(train=train_loader, valid=valid_loader)
 
     # --------------------------------------------------------------------------------- #

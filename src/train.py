@@ -24,7 +24,7 @@ from model.inceptionNet import InceptionNet
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
 from utils.data_augmentation import save_augmented_dataset
 from utils.sinogram import save_sparse_sinograms, save_interpolated_sinograms
-from model.FCSinogramReconstruction import SinogramInterpolator
+from model.FCSinogramReconstruction import SinogramInterpolator, FCSinogramReconstruction
 
 
 from deeplib.history import History
@@ -109,7 +109,7 @@ def train_network(
 	history_callback = HistoryCallback()
 	checkpoint_callback = ModelCheckpoint("{}_best.pt".format(save_path), save_best_only=True)
 	if lr_decay	<= 0:
-		scheduler = ReduceLROnPlateau(patience=5, factor=0.5)
+		scheduler = ReduceLROnPlateau(patience=6, factor=0.8)
 	else:
 		scheduler = ExponentialLR(lr_decay)
 	# scheduler = ExponentialLR(lr_decay)
@@ -149,7 +149,7 @@ def train_network(
 			epochs=n_epoch,
 			progress_options=dict(coloring=False),
 			callbacks=callbacks)
-		# model.evaluate_generator(train_loader)
+		# model.evaluate_generator(valid_loader)
 		# exit(0)
 		# --------------------------------------------------------------------------------- #
 		#                            save model at the end                                  #
@@ -207,7 +207,7 @@ if __name__ == '__main__':
 	load_network_state = False
 	lr = 0.0001
 	momentum = 0.9
-	n_epoch = 200
+	n_epoch = 300
 	batch_size = 4
 	weight_decay = 1e-4 * 0.5
 	criterion = "RMSELoss"
@@ -224,13 +224,13 @@ if __name__ == '__main__':
 	num_groups = 8
 
 	init_funcs = {
-		"Xavier_Normal": dict(func=init.xavier_normal_, func_kwargs=dict(gain=1)),
-		"Kaiming_Uniform": dict(func=init.kaiming_normal_, func_kwargs=dict(a=1)),
+		"Xavier_Normal": dict(func=init.xavier_normal_, func_kwargs=dict(gain=1/np.sqrt(5))),
+		"Kaiming_Uniform": dict(func=init.kaiming_normal_, func_kwargs=dict(a=1))
 	}
 	initialization: str = "Kaiming_Uniform"
 
 	# seed
-	seed = 111
+	seed = 42
 	set_seed(seed)
 	# --------------------------------------------------------------------------------- #
 	#                            network                                                #
@@ -249,7 +249,7 @@ if __name__ == '__main__':
 		"Pretrained SMP UNet",
 		"SMP UNet",
 		"BreastCNN",
-		"SinogramInterpolator"
+		"FCSinogramReconstruction"
 	]
 	network_to_use: str = "BreastUNet"
 	if network_to_use not in available_networks:
@@ -313,7 +313,7 @@ if __name__ == '__main__':
 			use_maxpool=False, up=[False, False, False, False], kernel_asym_dim=3)
 		preprocessing = None
 	elif network_to_use == "BreastUNet":
-		model = BreastCNN(1, 1, norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=True)
+		model = BreastCNN(1, 1, norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=True, upsample_mode="bicubic")
 		preprocessing = None
 	elif network_to_use == "BreastUNetSinogramInterpolator":
 		model = BreastCNN(1, 1, norm_momentum=batch_norm_momentum, middle_channels=[32, 64, 128], unet_arch=True, sparse_sinogram_net=True)
@@ -350,10 +350,10 @@ if __name__ == '__main__':
 	elif network_to_use == "Pretrained RED_CNN":
 		model = PretrainedREDCNN(unfreezed_layers=["conv", "tconv"])
 		preprocessing = None
-	elif network_to_use == "SinogramInterpolator":
+	elif network_to_use == "FCSinogramReconstruction":
 		#model = SinogramInterpolator(128, 1024, 512)
-		#model = FCSinogramReconstruction(128, 1024, 512, 5, 256)
-		model = SinogramInterpolator(1, 32, 1)
+		model = FCSinogramReconstruction(128, 1024, 512)
+		#model = SinogramInterpolator(1, 32, 1)
 		preprocessing = None
 	else:
 		warnings.warn("Something very wrong happened")
@@ -366,13 +366,13 @@ if __name__ == '__main__':
 	train_images = {}
 	train_images_aapm_osc_tv = load_all_images(["OSC_TV_AAPM"], n_batch=4, ext=".mha")
 	#train_images_aapm_fbp = load_all_images(["FBP128"], n_batch=4)
+	#train_images_aapm_input = load_all_images(["SINOGRAM128"], n_batch=1, flatten_images=True)
 	train_images_aapm_target = load_all_images(["PHANTOM"], n_batch=4)
 
-	#train_images["INPUTS"] = np.concatenate([train_images_aapm_osc_tv["OSC_TV_AAPM"], train_images_aapm_fbp["FBP128"]], axis=1)
-	train_images["INPUTS"] =train_images_aapm_osc_tv["OSC_TV_AAPM"]
+	train_images["INPUTS"] = train_images_aapm_osc_tv["OSC_TV_AAPM"]
+	#train_images["INPUTS"] = train_images_aapm_input["SINOGRAM128"]
 	train_images["TARGETS"] = train_images_aapm_target["PHANTOM"]
-	# train_images["INPUTS"] = np.concatenate((train_images_aapm["FBP128"][:3950], train_images_leo["AUG_BATCH"]))
-	# train_images["TARGETS"] = np.concatenate((train_images_aapm["PHANTOM"][:3600], train_images_leo["AUG_TARGET"]))
+
 	train_dataset = BreastCTDataset(train_images["INPUTS"], train_images["TARGETS"], preprocessing=preprocessing)
 	#print(train_images_aapm["SINOGRAM"].shape)
 	# train_dataset = BreastCTDataset(train_images_aapm["FBP"][:100], train_images_aapm["PHANTOM"][:100], preprocessing=preprocessing)
@@ -394,7 +394,7 @@ if __name__ == '__main__':
 	#                         network initialization                                    #
 	# --------------------------------------------------------------------------------- #
 	params = init_funcs[initialization]
-	initialize_network_(model, params["func"], **params["func_kwargs"])
+	# initialize_network_(model, params["func"], **params["func_kwargs"])
 
 	# --------------------------------------------------------------------------------- #
 	#                           network training                                        #

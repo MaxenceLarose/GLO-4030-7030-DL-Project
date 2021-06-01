@@ -102,22 +102,37 @@ class Up(nn.Module):
 
 class BreastCNN(nn.Module):
 	def __init__(self, in_channels, out_channels, norm_momentum=0.1, middle_channels=[16, 32, 64], unet_arch=False, norm="BN", num_groups=4,
-		sparse_sinogram_net=False):
+		sparse_sinogram_net=False, upsample_mode="bilinear"):
 		super().__init__()
 		self.sparse_sinogram_net = sparse_sinogram_net
 		self.unet_arch = unet_arch
-		if self.sparse_sinogram_net:
-			self.up = nn.Upsample(scale_factor=(4,1), mode='bilinear', align_corners=True)
-		self.up1 = nn.Upsample(scale_factor=2, mode='nearest')
-		if self.unet_arch:
-			self.up2 = nn.Upsample(scale_factor=2, mode='nearest')
-			self.up3 = nn.Upsample(scale_factor=2, mode='nearest')
+		if upsample_mode == "linear" or upsample_mode == "bilinear" or upsample_mode == "trilinear":
+			align_corners = True
 		else:
-			self.up2 = nn.Upsample(scale_factor=4, mode='nearest')
-		#self.up1 = Up(middle_channels[1], 1, scale_factor=2)
-		#self.up2 = Up(middle_channels[2], 1, scale_factor=4)
+			align_corners = False
+		if self.sparse_sinogram_net:
+			self.up = nn.Upsample(scale_factor=(4,1), mode=upsample_mode, align_corners=align_corners)
+		if upsample_mode == "linear" or upsample_mode == "bilinear" or upsample_mode == "trilinear" or upsample_mode == "bicubic"\
+		or upsample_mode == "nearest":
+			self.up1 = nn.Upsample(scale_factor=2, mode=upsample_mode, align_corners=align_corners)
+			if self.unet_arch:
+				self.up2 = nn.Upsample(scale_factor=2, mode=upsample_mode, align_corners=align_corners)
+				self.up3 = nn.Upsample(scale_factor=2, mode=upsample_mode, align_corners=align_corners)
+			else:
+				self.up2 = nn.Upsample(scale_factor=4, mode=upsample_mode, align_corners=align_corners)
+		elif upsample_mode == "ConvTranspose2d":
+			self.up1 = nn.ConvTranspose2d(middle_channels[1] , middle_channels[1], kernel_size=2, stride=2)
+			if self.unet_arch:
+				self.up2 = nn.ConvTranspose2d(middle_channels[2] , middle_channels[2], kernel_size=2, stride=2)
+				self.up3 = nn.ConvTranspose2d(middle_channels[1] , middle_channels[1], kernel_size=2, stride=2)
+			else:
+				raise RuntimeError("Conv transpose 2d not implemented!")
+				#self.up2 = nn.Upsample(scale_factor=4, mode=upsample_mode, align_corners=align_corners)
+		else:
+			raise RuntimeError("Upsample method not available!")
+		print(upsample_mode)
 
-
+	
 		self.blockDown1_1 = ConvBlock1(in_channels, middle_channels[0], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
 		self.blockDown1_2 = ConvBlock1(middle_channels[0], middle_channels[0], norm_momentum=norm_momentum, norm=norm, num_groups=num_groups)
 		#self.blockDown1_3 = ConvBlock1(middle_channels[0], middle_channels[0], norm_momentum=norm_momentum)
@@ -161,6 +176,7 @@ class BreastCNN(nn.Module):
 		if self.sparse_sinogram_net:
 			x = self.up(x)
 			res = x
+		# res = x
 		x = self.blockDown1_1(x)
 		x = self.blockDown1_2(x)
 		#x = self.blockDown1_3(x)
@@ -209,6 +225,7 @@ class BreastCNN(nn.Module):
 		out = self.out_conv(torch.cat([x, x1, x2], 1))
 		if self.sparse_sinogram_net:
 			out += res
+		# out += res
 		# out = self.out_bn(out)
 		out = self.out_relu(out)
 		return out
