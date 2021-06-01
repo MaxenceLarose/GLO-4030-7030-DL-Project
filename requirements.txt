@@ -24,6 +24,7 @@ scikit-learn==0.24.1
 scipy==1.6.1
 segmentation-models-pytorch==0.1.3
 Shapely==1.7.1
+SimpleITK==2.0.2
 six==1.15.0
 threadpoolctl==2.1.0
 tifffile==2021.3.31
